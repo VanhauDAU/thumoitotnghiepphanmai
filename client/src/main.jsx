@@ -6,15 +6,18 @@ import {
   Camera,
   Check,
   Clock,
+  Copy,
   GraduationCap,
   Heart,
   ImagePlus,
+  Link2,
   MapPin,
   Medal,
   Plus,
   Save,
   Sparkles,
-  Trash2
+  Trash2,
+  Users
 } from "lucide-react";
 import "./styles.css";
 
@@ -81,6 +84,11 @@ const fields = [
   ["description", "Mô tả thêm"],
   ["dressCode", "Dress code"],
   ["rsvpUrl", "Link xác nhận tham dự"]
+];
+
+const RELATION_OPTIONS = [
+  "Anh", "Chị", "Bạn", "Cô", "Chú", "Bác", "Ông", "Bà",
+  "Em", "Thầy", "Cô giáo", "Anh họ", "Chị họ"
 ];
 
 function normalizeConfig(data) {
@@ -171,12 +179,45 @@ function useConfig() {
   return { config, setConfig, loading };
 }
 
+// Hook: lấy thông tin khách từ token trong URL (chỉ dùng ở trang mời)
+function useGuestToken() {
+  const [guest, setGuest] = useState(null); // null = chưa biết, false = không có token/không tìm thấy
+  const [checked, setChecked] = useState(false);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const token = params.get("token");
+    if (!token) {
+      setGuest(false);
+      setChecked(true);
+      return;
+    }
+    fetch(`/api/guest/${token}`)
+      .then((res) => {
+        if (!res.ok) throw new Error("not found");
+        return res.json();
+      })
+      .then((data) => setGuest(data))
+      .catch(() => setGuest(false))
+      .finally(() => setChecked(true));
+  }, []);
+
+  return { guest, checked };
+}
+
+// ── Invitation ────────────────────────────────────────────────────────────────
+
 function Invitation({ config }) {
   const countdown = useCountdown(config);
+  const { guest, checked } = useGuestToken();
+
   const photos = useMemo(() => {
     const merged = [...(config.heroImages || []), config.heroImage].filter(Boolean);
     return [...new Set(merged)];
   }, [config.heroImage, config.heroImages]);
+
+  // Chưa kiểm tra token xong thì không render để tránh flash
+  if (!checked) return null;
 
   return (
     <main className="invitation-shell">
@@ -190,6 +231,19 @@ function Invitation({ config }) {
           <span>{config.school}</span>
         </div>
       </section>
+
+      {/* Banner cá nhân hóa – CHỈ hiển thị khi có khách hợp lệ */}
+      {guest && (
+        <section className="content-section guest-banner">
+          <div className="guest-banner-inner">
+            <Heart size={20} className="guest-banner-icon" />
+            <p>
+              Kính mời <span className="guest-relation">{guest.relation}</span>{" "}
+              <strong className="guest-name">{guest.name}</strong>
+            </p>
+          </div>
+        </section>
+      )}
 
       <section className="content-section intro">
         <Sparkles size={22} />
@@ -289,6 +343,8 @@ function Invitation({ config }) {
     </main>
   );
 }
+
+// ── Photo Carousel ─────────────────────────────────────────────────────────────
 
 function PhotoCarousel({ photos, graduateName }) {
   const [activeIndex, setActiveIndex] = useState(0);
@@ -404,11 +460,14 @@ function Info({ icon, label, value }) {
   );
 }
 
+// ── Admin ─────────────────────────────────────────────────────────────────────
+
 function Admin({ config, setConfig }) {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [adminToken, setAdminToken] = useState(() => localStorage.getItem("adminToken") || "");
   const [error, setError] = useState("");
+  const [activeTab, setActiveTab] = useState("config"); // "config" | "guests"
 
   const updateField = (key, value) => {
     setConfig((current) => ({ ...current, [key]: value }));
@@ -474,7 +533,6 @@ function Admin({ config, setConfig }) {
   };
 
   const longTextFields = ["message", "greeting", "description", "privateMessage"];
-
   const heroImages = config.heroImages || [];
 
   const save = async () => {
@@ -506,12 +564,35 @@ function Admin({ config, setConfig }) {
           <p className="eyebrow">Quản trị</p>
           <h1>Cấu hình thư mời</h1>
         </div>
-        <button onClick={save} disabled={saving}>
-          <Save size={18} />
-          {saving ? "Đang lưu" : saved ? "Đã lưu" : "Lưu"}
-        </button>
+        <div className="admin-header-actions">
+          {activeTab === "config" && (
+            <button onClick={save} disabled={saving}>
+              <Save size={18} />
+              {saving ? "Đang lưu" : saved ? "Đã lưu ✓" : "Lưu"}
+            </button>
+          )}
+        </div>
       </header>
 
+      {/* Tab navigation */}
+      <div className="admin-tabs">
+        <button
+          className={activeTab === "config" ? "active" : ""}
+          onClick={() => setActiveTab("config")}
+        >
+          <Save size={16} />
+          Cấu hình thư mời
+        </button>
+        <button
+          className={activeTab === "guests" ? "active" : ""}
+          onClick={() => setActiveTab("guests")}
+        >
+          <Users size={16} />
+          Quản lý khách mời
+        </button>
+      </div>
+
+      {/* Token chung */}
       <section className="admin-panel media-panel">
         <label className="token-field">
           <span>Admin token</span>
@@ -522,81 +603,263 @@ function Admin({ config, setConfig }) {
             placeholder="Chỉ cần nhập nếu Render có ADMIN_TOKEN"
           />
         </label>
-        <label className="upload-box">
-          <ImagePlus size={24} />
-          <span>Ảnh chính của người tốt nghiệp</span>
-          <small>Chọn nhiều ảnh để hiển thị trong khung hero</small>
-          <input
-            type="file"
-            accept="image/*"
-            multiple
-            onChange={(e) => uploadImages(e.target.files, "heroImages")}
-          />
-        </label>
-        <div className="gallery-manager hero-image-manager">
-          {heroImages.map((image) => (
-            <div className="image-manager-item" key={image}>
-              <button type="button" onClick={() => setPrimaryHeroImage(image)} title="Đặt làm ảnh chính đầu tiên">
-                <img src={resolveAsset(image)} alt="Ảnh chính" />
-                {config.heroImage === image && <span>Chính</span>}
-              </button>
-              <button type="button" className="delete-image-button" onClick={() => removeHeroImage(image)} title="Xóa ảnh">
-                <Trash2 size={16} />
-              </button>
-            </div>
-          ))}
-        </div>
       </section>
+
       {error && <p className="admin-error">{error}</p>}
 
-      <section className="admin-panel form-grid">
-        {fields.map(([key, label, type = "text"]) => (
-          <label key={key} className={longTextFields.includes(key) ? "wide" : ""}>
-            <span>{label}</span>
-            {longTextFields.includes(key) ? (
-              <textarea value={config[key] || ""} onChange={(e) => updateField(key, e.target.value)} rows={3} />
-            ) : (
-              <input type={type} value={config[key] || ""} onChange={(e) => updateField(key, e.target.value)} />
-            )}
-          </label>
-        ))}
-      </section>
-
-      <section className="admin-panel">
-        <PanelTitle icon={<Camera size={20} />} title="Ảnh kỷ niệm bên dưới" />
-        <label className="inline-upload">
-          <ImagePlus size={18} />
-          Thêm ảnh
-          <input type="file" accept="image/*" multiple onChange={(e) => uploadImages(e.target.files, "gallery")} />
-        </label>
-        <div className="gallery-manager">
-          {(config.gallery || []).map((image) => (
-            <div className="image-manager-item" key={image}>
-              <button type="button" onClick={() => removeGalleryImage(image)} title="Xóa ảnh">
-                <img src={resolveAsset(image)} alt="Ảnh thư viện" />
-              </button>
-              <button type="button" className="delete-image-button" onClick={() => removeGalleryImage(image)} title="Xóa ảnh">
-                <Trash2 size={16} />
-              </button>
+      {activeTab === "config" && (
+        <>
+          <section className="admin-panel media-panel">
+            <label className="upload-box">
+              <ImagePlus size={24} />
+              <span>Ảnh chính của người tốt nghiệp</span>
+              <small>Chọn nhiều ảnh để hiển thị trong khung hero</small>
+              <input
+                type="file"
+                accept="image/*"
+                multiple
+                onChange={(e) => uploadImages(e.target.files, "heroImages")}
+              />
+            </label>
+            <div className="gallery-manager hero-image-manager">
+              {heroImages.map((image) => (
+                <div className="image-manager-item" key={image}>
+                  <button type="button" onClick={() => setPrimaryHeroImage(image)} title="Đặt làm ảnh chính đầu tiên">
+                    <img src={resolveAsset(image)} alt="Ảnh chính" />
+                    {config.heroImage === image && <span>Chính</span>}
+                  </button>
+                  <button type="button" className="delete-image-button" onClick={() => removeHeroImage(image)} title="Xóa ảnh">
+                    <Trash2 size={16} />
+                  </button>
+                </div>
+              ))}
             </div>
-          ))}
-        </div>
-      </section>
+          </section>
 
-      <ListEditor
-        title="Lưu ý"
-        items={config.notes || []}
-        addLabel="Thêm lưu ý"
-        onChange={(items) => updateField("notes", items)}
-      />
+          <section className="admin-panel form-grid">
+            {fields.map(([key, label, type = "text"]) => (
+              <label key={key} className={longTextFields.includes(key) ? "wide" : ""}>
+                <span>{label}</span>
+                {longTextFields.includes(key) ? (
+                  <textarea value={config[key] || ""} onChange={(e) => updateField(key, e.target.value)} rows={3} />
+                ) : (
+                  <input type={type} value={config[key] || ""} onChange={(e) => updateField(key, e.target.value)} />
+                )}
+              </label>
+            ))}
+          </section>
 
-      <MemoryEditor
-        items={config.memories || []}
-        onChange={(items) => updateField("memories", items)}
-      />
+          <section className="admin-panel">
+            <PanelTitle icon={<Camera size={20} />} title="Ảnh kỷ niệm bên dưới" />
+            <label className="inline-upload">
+              <ImagePlus size={18} />
+              Thêm ảnh
+              <input type="file" accept="image/*" multiple onChange={(e) => uploadImages(e.target.files, "gallery")} />
+            </label>
+            <div className="gallery-manager">
+              {(config.gallery || []).map((image) => (
+                <div className="image-manager-item" key={image}>
+                  <button type="button" onClick={() => removeGalleryImage(image)} title="Xóa ảnh">
+                    <img src={resolveAsset(image)} alt="Ảnh thư viện" />
+                  </button>
+                  <button type="button" className="delete-image-button" onClick={() => removeGalleryImage(image)} title="Xóa ảnh">
+                    <Trash2 size={16} />
+                  </button>
+                </div>
+              ))}
+            </div>
+          </section>
+
+          <ListEditor
+            title="Lưu ý"
+            items={config.notes || []}
+            addLabel="Thêm lưu ý"
+            onChange={(items) => updateField("notes", items)}
+          />
+
+          <MemoryEditor
+            items={config.memories || []}
+            onChange={(items) => updateField("memories", items)}
+          />
+        </>
+      )}
+
+      {activeTab === "guests" && (
+        <GuestManager authHeaders={authHeaders} />
+      )}
     </main>
   );
 }
+
+// ── Guest Manager ─────────────────────────────────────────────────────────────
+
+function GuestManager({ authHeaders }) {
+  const [guests, setGuests] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [name, setName] = useState("");
+  const [relation, setRelation] = useState("Bạn");
+  const [creating, setCreating] = useState(false);
+  const [error, setError] = useState("");
+  const [copiedId, setCopiedId] = useState(null);
+
+  const baseUrl = `${window.location.protocol}//${window.location.host}`;
+
+  const fetchGuests = async () => {
+    setLoading(true);
+    try {
+      const res = await fetch("/api/guests", { headers: authHeaders() });
+      if (!res.ok) throw new Error("Không tải được danh sách khách");
+      setGuests(await res.json());
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchGuests();
+  }, []);
+
+  const createGuest = async (e) => {
+    e.preventDefault();
+    if (!name.trim()) return;
+    setCreating(true);
+    setError("");
+    try {
+      const res = await fetch("/api/guests", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...authHeaders() },
+        body: JSON.stringify({ name: name.trim(), relation })
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.message || "Không tạo được khách mời");
+      }
+      const guest = await res.json();
+      setGuests((prev) => [guest, ...prev]);
+      setName("");
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  const deleteGuest = async (id) => {
+    setError("");
+    try {
+      const res = await fetch(`/api/guests/${id}`, {
+        method: "DELETE",
+        headers: authHeaders()
+      });
+      if (!res.ok) throw new Error("Không xóa được khách");
+      setGuests((prev) => prev.filter((g) => g.id !== id));
+    } catch (err) {
+      setError(err.message);
+    }
+  };
+
+  const copyLink = (token) => {
+    const link = `${baseUrl}/?token=${token}`;
+    navigator.clipboard.writeText(link).then(() => {
+      setCopiedId(token);
+      setTimeout(() => setCopiedId(null), 2000);
+    });
+  };
+
+  return (
+    <section className="admin-panel guest-manager">
+      <PanelTitle icon={<Users size={20} />} title="Quản lý khách mời" />
+
+      <p className="guest-manager-desc">
+        Tạo link cá nhân cho từng khách. Khi khách mở link, trang sẽ hiển thị lời mời có tên và quan hệ riêng.
+        Link mặc định (không có token) sẽ <strong>không</strong> hiển thị tên người được mời.
+      </p>
+
+      {error && <p className="admin-error">{error}</p>}
+
+      {/* Form tạo khách mới */}
+      <form className="guest-form" onSubmit={createGuest}>
+        <div className="guest-form-row">
+          <label className="guest-form-field">
+            <span>Tên khách mời</span>
+            <input
+              type="text"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="Ví dụ: Nguyễn Văn An"
+              required
+            />
+          </label>
+          <label className="guest-form-field">
+            <span>Quan hệ / Xưng hô</span>
+            <select value={relation} onChange={(e) => setRelation(e.target.value)}>
+              {RELATION_OPTIONS.map((r) => (
+                <option key={r} value={r}>{r}</option>
+              ))}
+            </select>
+          </label>
+        </div>
+        <button type="submit" disabled={creating || !name.trim()} className="guest-create-btn">
+          <Link2 size={18} />
+          {creating ? "Đang tạo..." : "Tạo link mời"}
+        </button>
+      </form>
+
+      {/* Danh sách khách */}
+      <div className="guest-list">
+        {loading && <p className="guest-loading">Đang tải...</p>}
+        {!loading && guests.length === 0 && (
+          <p className="guest-empty">Chưa có khách mời nào. Tạo link đầu tiên bên trên.</p>
+        )}
+        {guests.map((guest) => {
+          const link = `${baseUrl}/?token=${guest.token}`;
+          return (
+            <div className="guest-item" key={guest.id}>
+              <div className="guest-info">
+                <div className="guest-name-row">
+                  <span className="guest-badge">{guest.relation}</span>
+                  <strong>{guest.name}</strong>
+                </div>
+                <a
+                  className="guest-link"
+                  href={link}
+                  target="_blank"
+                  rel="noreferrer"
+                  title="Mở link mời"
+                >
+                  {link}
+                </a>
+              </div>
+              <div className="guest-actions">
+                <button
+                  type="button"
+                  className={`copy-btn ${copiedId === guest.token ? "copied" : ""}`}
+                  onClick={() => copyLink(guest.token)}
+                  title="Sao chép link"
+                >
+                  {copiedId === guest.token ? <Check size={16} /> : <Copy size={16} />}
+                  {copiedId === guest.token ? "Đã sao chép" : "Sao chép"}
+                </button>
+                <button
+                  type="button"
+                  className="delete-guest-btn"
+                  onClick={() => deleteGuest(guest.id)}
+                  title="Xóa khách"
+                >
+                  <Trash2 size={16} />
+                </button>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
+// ── Shared components ─────────────────────────────────────────────────────────
 
 function PanelTitle({ icon, title }) {
   return (
@@ -664,6 +927,8 @@ function MemoryEditor({ items, onChange }) {
     </section>
   );
 }
+
+// ── App ───────────────────────────────────────────────────────────────────────
 
 function App() {
   const { config, setConfig, loading } = useConfig();
