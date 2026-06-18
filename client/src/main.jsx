@@ -228,6 +228,12 @@ function EnvelopeScreen({ config, guest, onOpen }) {
         ))}
       </div>
 
+      {/* Text tiêu đề phía trên */}
+      <div className="env-header">
+        <p className="eyebrow" style={{ color: "rgb(255 246 228 / 80%)" }}>Bạn có một thư mời</p>
+        <h1 className="env-name">{config.graduateName || "Lễ Tốt Nghiệp"}</h1>
+      </div>
+
       {/* Phong bì */}
       <div className="envelope-wrap">
         <div className="envelope">
@@ -249,16 +255,16 @@ function EnvelopeScreen({ config, guest, onOpen }) {
         </div>
       </div>
 
-      {/* Text phía trên */}
-      <div className="env-header">
-        <p className="eyebrow" style={{ color: "rgb(255 246 228 / 80%)" }}>Bạn có một thư mời</p>
-        <h1 className="env-name">{config.graduateName || "Lễ Tốt Nghiệp"}</h1>
-        {guest && (
-          <p className="env-guest">
-            Kính gửi <span>{guest.relation}</span> <strong>{guest.name}</strong>
-          </p>
-        )}
-      </div>
+      {/* Tên người được mời – nổi bật bên dưới phong bì, chỉ hiện khi có token */}
+      {guest && (
+        <div className="env-to-card">
+          <span className="env-to-label">✉ Kính gửi</span>
+          <div className="env-to-name">
+            <span className="env-to-relation">{guest.relation}</span>
+            <strong className="env-to-fullname">{guest.name}</strong>
+          </div>
+        </div>
+      )}
 
       {/* Nút mở */}
       <button

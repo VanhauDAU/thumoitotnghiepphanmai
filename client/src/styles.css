@@ -1649,3 +1649,53 @@ a {
     transform: translateY(0) scale(1);
   }
 }
+
+/* ── "Kính gửi" card trên phong bì ─────────────────────────────────────── */
+
+.env-to-card {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 6px;
+  padding: 14px 28px 16px;
+  border-radius: 14px;
+  background: linear-gradient(135deg, rgb(255 255 255 / 13%), rgb(255 255 255 / 6%));
+  border: 1px solid rgb(255 220 140 / 28%);
+  backdrop-filter: blur(8px);
+  text-align: center;
+  min-width: min(300px, 82vw);
+  animation: fadeUp 700ms 100ms ease both;
+}
+
+.env-to-label {
+  font-size: 0.75rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgb(255 220 140 / 65%);
+}
+
+.env-to-name {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.env-to-relation {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #a8dbd5;
+}
+
+.env-to-fullname {
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 1.6rem;
+  font-weight: 500;
+  color: #ffe4a0;
+  line-height: 1.15;
+}
