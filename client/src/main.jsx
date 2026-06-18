@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import {
   Award,
@@ -206,16 +206,147 @@ function useGuestToken() {
   return { guest, checked };
 }
 
+// ── Confetti Burst ───────────────────────────────────────────────────────────
+
+const CONFETTI_COLORS = [
+  "#ffe066", "#ffc940", "#8ecae6", "#a8dbd5",
+  "#ffffff", "#f4a261", "#e9c46a", "#90e0ef", "#ffb347",
+];
+
+function ConfettiBurst({ active }) {
+  const particles = useMemo(() => {
+    if (!active) return [];
+    return Array.from({ length: 90 }, (_, i) => {
+      const angle = (i / 90) * 360 + (Math.random() - 0.5) * 22;
+      const rad = (angle * Math.PI) / 180;
+      const dist = 120 + Math.random() * 230;
+      const isRect = Math.random() > 0.45;
+      const w = 5 + Math.random() * 6;
+      return {
+        id: i,
+        color: CONFETTI_COLORS[i % CONFETTI_COLORS.length],
+        w,
+        h: isRect ? w * 2.8 : w,
+        br: isRect ? 2 : "50%",
+        tx: Math.cos(rad) * dist,
+        ty: Math.sin(rad) * dist - 80,
+        rot: Math.random() * 560 - 280,
+        dur: 0.65 + Math.random() * 0.7,
+        delay: Math.random() * 0.18,
+      };
+    });
+  }, [active]);
+
+  if (!active) return null;
+
+  return (
+    <div className="confetti-container" aria-hidden="true">
+      {particles.map((p) => (
+        <div
+          key={p.id}
+          className="confetti-particle"
+          style={{
+            width: p.w,
+            height: p.h,
+            background: p.color,
+            borderRadius: p.br,
+            "--tx": `${p.tx}px`,
+            "--ty": `${p.ty}px`,
+            "--rot": `${p.rot}deg`,
+            "--dur": `${p.dur}s`,
+            "--delay": `${p.delay}s`,
+          }}
+        />
+      ))}
+    </div>
+  );
+}
+
+// ── Scroll Reveal hook ────────────────────────────────────────────────────────
+
+function useScrollReveal() {
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add("revealed");
+            observer.unobserve(entry.target);
+          }
+        });
+      },
+      { threshold: 0.08, rootMargin: "0px 0px -30px 0px" }
+    );
+    const raf = requestAnimationFrame(() => {
+      document.querySelectorAll("[data-reveal]").forEach((el) => observer.observe(el));
+    });
+    return () => { cancelAnimationFrame(raf); observer.disconnect(); };
+  }, []);
+}
+
+// ── Flip Digit ────────────────────────────────────────────────────────────────
+
+function FlipDigit({ value }) {
+  const ref = useRef(null);
+  const prevRef = useRef(value);
+
+  useEffect(() => {
+    if (value !== prevRef.current && ref.current) {
+      ref.current.classList.remove("digit-flip");
+      void ref.current.offsetWidth; // force reflow
+      ref.current.classList.add("digit-flip");
+      prevRef.current = value;
+    }
+  }, [value]);
+
+  return (
+    <strong ref={ref} className="countdown-digit">
+      {String(value).padStart(2, "0")}
+    </strong>
+  );
+}
+
 // ── Envelope Screen ───────────────────────────────────────────────────────────
 
 function EnvelopeScreen({ config, guest, onOpen }) {
   const [opening, setOpening] = useState(false);
+  const [confetti, setConfetti] = useState(false);
+  const envelopeRef = useRef(null);
+  const wrapRef = useRef(null);
+
+  // Sparkle positions (stable, generated once)
+  const sparkles = useMemo(() =>
+    Array.from({ length: 9 }, (_, i) => ({
+      id: i,
+      size: 5 + Math.random() * 6,
+      x: 8 + Math.random() * 84,
+      y: 8 + Math.random() * 84,
+      delay: i * 0.32,
+      dur: 1.4 + Math.random() * 1.2,
+    }))
+  , []);
 
   const handleOpen = () => {
     setOpening(true);
-    // Sau khi animation envelope xong (~900ms) thì chuyển sang thiệp
-    setTimeout(() => onOpen(), 900);
+    setConfetti(true);
+    setTimeout(() => onOpen(), 920);
   };
+
+  // 3D mouse tilt
+  const onMouseMove = useCallback((e) => {
+    if (!envelopeRef.current || opening) return;
+    const rect = envelopeRef.current.getBoundingClientRect();
+    const dx = (e.clientX - (rect.left + rect.width / 2)) / (rect.width / 2);
+    const dy = (e.clientY - (rect.top + rect.height / 2)) / (rect.height / 2);
+    envelopeRef.current.style.transform =
+      `rotateY(${dx * 16}deg) rotateX(${-dy * 11}deg) scale(1.03)`;
+  }, [opening]);
+
+  const onMouseLeave = useCallback(() => {
+    if (envelopeRef.current) {
+      envelopeRef.current.style.transform = "";
+    }
+  }, []);
 
   return (
     <div className={`envelope-screen${opening ? " opening" : ""}`}>
@@ -234,9 +365,18 @@ function EnvelopeScreen({ config, guest, onOpen }) {
         <h1 className="env-name">{config.graduateName || "Lễ Tốt Nghiệp"}</h1>
       </div>
 
-      {/* Phong bì */}
-      <div className="envelope-wrap">
-        <div className="envelope">
+      {/* Phong bì với 3D tilt */}
+      <div
+        className="envelope-wrap"
+        ref={wrapRef}
+        onMouseMove={onMouseMove}
+        onMouseLeave={onMouseLeave}
+      >
+        <div
+          className="envelope"
+          ref={envelopeRef}
+          style={{ transition: opening ? "transform 0.9s ease" : "transform 0.12s ease" }}
+        >
           {/* Nắp phong bì */}
           <div className="envelope-flap">
             <div className="envelope-flap-inner" />
@@ -252,13 +392,30 @@ function EnvelopeScreen({ config, guest, onOpen }) {
             <Sparkles size={14} />
             <span>Thư mời tốt nghiệp</span>
           </div>
+          {/* Sparkle dots lung linh */}
+          {sparkles.map((s) => (
+            <div
+              key={s.id}
+              className="env-sparkle-dot"
+              style={{
+                width: s.size,
+                height: s.size,
+                left: `${s.x}%`,
+                top: `${s.y}%`,
+                animationDelay: `${s.delay}s`,
+                animationDuration: `${s.dur}s`,
+              }}
+            />
+          ))}
         </div>
+        {/* Confetti nổ từ giữa phong bì */}
+        <ConfettiBurst active={confetti} />
       </div>
 
       {/* Tên người được mời – nổi bật bên dưới phong bì, chỉ hiện khi có token */}
       {guest && (
         <div className="env-to-card">
-          <span className="env-to-label">✉ Kính gửi</span>
+          <span className="env-to-label">THÂN MỜI</span>
           <div className="env-to-name">
             <span className="env-to-relation">{guest.relation}</span>
             <strong className="env-to-fullname">{guest.name}</strong>
@@ -287,13 +444,13 @@ function EnvelopeScreen({ config, guest, onOpen }) {
 function Invitation({ config, isOpened }) {
   const countdown = useCountdown(config);
   const { guest, checked } = useGuestToken();
+  useScrollReveal();
 
   const photos = useMemo(() => {
     const merged = [...(config.heroImages || []), config.heroImage].filter(Boolean);
     return [...new Set(merged)];
   }, [config.heroImage, config.heroImages]);
 
-  // Chưa kiểm tra token xong thì không render để tránh flash
   if (!checked) return null;
 
   return (
@@ -311,7 +468,7 @@ function Invitation({ config, isOpened }) {
 
       {/* Banner cá nhân hóa – CHỈ hiển thị khi có khách hợp lệ */}
       {guest && (
-        <section className="content-section guest-banner">
+        <section className="content-section guest-banner" data-reveal>
           <div className="guest-banner-inner">
             <Heart size={20} className="guest-banner-icon" />
             <p>
@@ -322,7 +479,7 @@ function Invitation({ config, isOpened }) {
         </section>
       )}
 
-      <section className="content-section intro">
+      <section className="content-section intro" data-reveal>
         <Sparkles size={22} />
         <p>{config.greeting}</p>
         <strong>{config.message}</strong>
@@ -330,7 +487,7 @@ function Invitation({ config, isOpened }) {
       </section>
 
       {config.privateMessage && (
-        <section className="content-section private-message">
+        <section className="content-section private-message" data-reveal>
           <Heart size={22} />
           <div>
             <p className="eyebrow">Lời nhắn gửi riêng</p>
@@ -339,7 +496,7 @@ function Invitation({ config, isOpened }) {
         </section>
       )}
 
-      <section className="countdown-section">
+      <section className="countdown-section" data-reveal>
         <div>
           <p className="eyebrow">{config.eventTitle}</p>
           <h2>{countdown.expired ? "Hẹn gặp tại buổi lễ" : "Đếm ngược đến ngày vui"}</h2>
@@ -347,28 +504,28 @@ function Invitation({ config, isOpened }) {
         <div className="countdown-grid">
           {countdown.items.map(([label, value]) => (
             <article key={label}>
-              <strong>{String(value).padStart(2, "0")}</strong>
+              <FlipDigit value={value} />
               <span>{label}</span>
             </article>
           ))}
         </div>
       </section>
 
-      <section className="content-section event-grid">
+      <section className="content-section event-grid" data-reveal>
         <Info icon={<CalendarDays />} label="Ngày" value={formatDate(config.eventDate)} />
         <Info icon={<Clock />} label="Thời gian" value={config.eventTime} />
         <Info icon={<MapPin />} label={config.locationName} value={config.locationAddress} />
       </section>
 
       {(config.gallery || []).length > 0 && (
-        <section className="memory-gallery">
+        <section className="memory-gallery" data-reveal>
           {(config.gallery || []).slice(0, 5).map((image, index) => (
             <img key={image} src={resolveAsset(image)} alt={`Khoảnh khắc ${index + 1}`} />
           ))}
         </section>
       )}
 
-      <section className="content-section memory-section">
+      <section className="content-section memory-section" data-reveal>
         <div className="section-heading">
           <Medal size={22} />
           <h2>Kỷ niệm đáng nhớ</h2>
@@ -386,7 +543,7 @@ function Invitation({ config, isOpened }) {
         </div>
       </section>
 
-      <section className="content-section note-section">
+      <section className="content-section note-section" data-reveal>
         <div className="section-heading">
           <Check size={22} />
           <h2>Lưu ý</h2>
@@ -398,7 +555,7 @@ function Invitation({ config, isOpened }) {
         </ul>
       </section>
 
-      <section className="content-section details">
+      <section className="content-section details" data-reveal>
         <p>Dress code: {config.dressCode}</p>
         <p>Trân trọng, {config.hostName}</p>
       </section>
