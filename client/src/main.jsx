@@ -632,15 +632,15 @@ function EnvelopeScreen({ config, guest, onOpen }) {
   );
   const { displayed, done: greetingDone } = useTypewriter(greetingText);
 
-  // Sparkle positions
+  // Sparkle positions (stable, generated once)
   const sparkles = useMemo(() =>
-    Array.from({ length: 8 }, (_, i) => ({
+    Array.from({ length: 9 }, (_, i) => ({
       id: i,
-      size: 4 + Math.random() * 5,
-      x: 6 + Math.random() * 88,
-      y: 6 + Math.random() * 88,
-      delay: i * 0.35,
-      dur: 1.6 + Math.random() * 1.0,
+      size: 5 + Math.random() * 6,
+      x: 8 + Math.random() * 84,
+      y: 8 + Math.random() * 84,
+      delay: i * 0.32,
+      dur: 1.4 + Math.random() * 1.2,
     }))
   , []);
 
@@ -649,7 +649,7 @@ function EnvelopeScreen({ config, guest, onOpen }) {
     playOpenSound();
     setOpening(true);
     setConfetti(true);
-    setTimeout(() => onOpen(), 1800);
+    setTimeout(() => onOpen(), 2450);
   };
 
   // 3D mouse tilt
@@ -659,31 +659,38 @@ function EnvelopeScreen({ config, guest, onOpen }) {
     const dx = (e.clientX - (rect.left + rect.width / 2)) / (rect.width / 2);
     const dy = (e.clientY - (rect.top + rect.height / 2)) / (rect.height / 2);
     envelopeRef.current.style.transform =
-      `rotateY(${dx * 14}deg) rotateX(${-dy * 10}deg) scale(1.025)`;
+      `rotateY(${dx * 16}deg) rotateX(${-dy * 11}deg) scale(1.03)`;
   }, [opening]);
 
   const onMouseLeave = useCallback(() => {
-    if (envelopeRef.current) envelopeRef.current.style.transform = "";
+    if (envelopeRef.current) {
+      envelopeRef.current.style.transform = "";
+    }
   }, []);
 
   return (
-    <div className={`envelope-screen pink-theme${opening ? " opening" : ""}${greetingDone ? " greeting-done" : ""}`}>
+    <div className={`envelope-screen${opening ? " opening" : ""}${greetingDone ? " greeting-done" : ""}`}>
       {/* Nền rơi icon */}
       <div className="env-bg-icons" aria-hidden="true">
         {Array.from({ length: 18 }).map((_, i) => (
           <span key={i} className={`env-bg-icon env-bg-icon-${i + 1}`}>
-            <GraduationCap size={i % 4 === 0 ? 26 : 16} />
+            <GraduationCap size={i % 4 === 0 ? 28 : 18} />
           </span>
         ))}
       </div>
 
-      {/* Header */}
+      {/* Text tiêu đề phía trên */}
       <div className="env-header">
-        <p className="eyebrow env-eyebrow">✉ Bạn có một thư mời đặc biệt</p>
+        <p className="eyebrow" style={{ color: "rgb(255 246 228 / 80%)" }}>Bạn có một thư mời</p>
         <h1 className="env-name">{config.graduateName || "Lễ Tốt Nghiệp"}</h1>
         <div className="intro-greeting-card">
           {config.introGreetingImage && (
-            <img className="intro-greeting-image" src={resolveAsset(config.introGreetingImage)} alt="" aria-hidden="true" />
+            <img
+              className="intro-greeting-image"
+              src={resolveAsset(config.introGreetingImage)}
+              alt=""
+              aria-hidden="true"
+            />
           )}
           <p className="typewriter-greeting">
             {displayed}
@@ -692,7 +699,7 @@ function EnvelopeScreen({ config, guest, onOpen }) {
         </div>
       </div>
 
-      {/* Phong bì hồng + card bên trong */}
+      {/* Phong bì với 3D tilt */}
       <div
         className="envelope-wrap"
         ref={wrapRef}
@@ -704,90 +711,64 @@ function EnvelopeScreen({ config, guest, onOpen }) {
           ref={envelopeRef}
           role="button"
           tabIndex={greetingDone ? 0 : -1}
-          aria-label="Click vào phong bì để mở thiệp"
+          aria-label="Click vào tấm thiệp để mở"
           onClick={handleOpen}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" || e.key === " ") { e.preventDefault(); handleOpen(); }
+          onKeyDown={(event) => {
+            if (event.key === "Enter" || event.key === " ") {
+              event.preventDefault();
+              handleOpen();
+            }
           }}
-          style={{ transition: opening ? "none" : "transform 0.12s ease" }}
+          style={{ transition: opening ? "transform 0.9s ease" : "transform 0.12s ease" }}
         >
-          {/* ── Tấm thiệp bên trong (trượt lên khi mở) ── */}
-          <div className="inner-card">
-            <div className="inner-card-content">
-              <div className="inner-card-deco" aria-hidden="true">
-                <GraduationCap size={32} />
-              </div>
-              <p className="inner-card-eyebrow">Thư mời tốt nghiệp</p>
-              <strong className="inner-card-name">{config.graduateName || "Lễ Tốt Nghiệp"}</strong>
-              {config.degree && <span className="inner-card-degree">{config.degree}</span>}
-              {guest && (
-                <p className="inner-card-to">
-                  Kính gửi <em>{guest.relation}</em> <strong>{guest.name}</strong>
-                </p>
-              )}
-              <div className="inner-card-divider" />
-              <p className="inner-card-hint">
-                <Heart size={12} /> Nhấn để xem chi tiết
-              </p>
-            </div>
+          <div className="letter-card-reveal">
+            <p>Thư mời tốt nghiệp</p>
+            <strong>{config.graduateName || "Lễ Tốt Nghiệp"}</strong>
+            {guest && <span>Gửi {guest.relation} {guest.name}</span>}
           </div>
-
-          {/* ── Nắp phong bì (lật lên khi mở) ── */}
+          {/* Nắp phong bì */}
           <div className="envelope-flap">
             <div className="envelope-flap-inner" />
-            {/* Diamond pattern trên nắp */}
-            <div className="flap-pattern" aria-hidden="true" />
           </div>
-
-          {/* ── Thân phong bì ── */}
+          {/* Thân phong bì */}
           <div className="envelope-body">
-            {/* Con dấu */}
             <div className="envelope-seal">
-              <GraduationCap size={22} />
+              <GraduationCap size={26} />
             </div>
-            {/* Đường chéo trang trí */}
-            <div className="env-body-lines" aria-hidden="true" />
           </div>
-
-          {/* Sparkle dots */}
+          {/* Thẻ nhỏ bên trong ló ra khi mở */}
+          <div className="envelope-card-peek">
+            <Sparkles size={14} />
+            <span>Thư mời tốt nghiệp</span>
+          </div>
+          {/* Sparkle dots lung linh */}
           {sparkles.map((s) => (
             <div
               key={s.id}
               className="env-sparkle-dot"
               style={{
-                width: s.size, height: s.size,
-                left: `${s.x}%`, top: `${s.y}%`,
+                width: s.size,
+                height: s.size,
+                left: `${s.x}%`,
+                top: `${s.y}%`,
                 animationDelay: `${s.delay}s`,
                 animationDuration: `${s.dur}s`,
               }}
             />
           ))}
         </div>
-
-        {/* Confetti */}
+        {/* Confetti nổ từ giữa phong bì */}
         <ConfettiBurst active={confetti} />
+        <div className="flying-paper-plane" aria-hidden="true" />
       </div>
-
       <Fireworks active={confetti} />
 
-      {/* Guest card bên dưới */}
-      {guest && (
-        <div className="env-to-card">
-          <span className="env-to-label">THÂN MỜI</span>
-          <div className="env-to-name">
-            <span className="env-to-relation">{guest.relation}</span>
-            <strong className="env-to-fullname">{guest.name}</strong>
-          </div>
-        </div>
-      )}
-
       <p className="env-hint">
-        {greetingDone ? "✨ Click vào phong bì để mở thiệp" : "Lời chào đang được gửi đến bạn..."}
+        {greetingDone ? "Click vào tấm thiệp để mở" : "Lời chào đang được gửi đến bạn..."}
       </p>
     </div>
   );
 }
-
 
 // ── Invitation ────────────────────────────────────────────────────────────────
 
