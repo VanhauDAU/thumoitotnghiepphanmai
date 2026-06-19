@@ -93,7 +93,7 @@ const fields = [
 
 const RELATION_OPTIONS = [
   "Anh", "Chị", "Bạn", "Cô", "Chú", "Bác", "Ông", "Bà",
-  "Em", "Thầy", "Cô giáo", "Anh họ", "Chị họ"
+  "Em", "Thầy", "Cô giáo", "Anh họ", "Chị họ", "Các bạn", "Anh/Chị"
 ];
 
 function normalizeConfig(data) {
