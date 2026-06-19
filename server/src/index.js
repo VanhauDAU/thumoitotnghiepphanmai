@@ -12,6 +12,7 @@ const rootDir = path.resolve(__dirname, "../..");
 const port = process.env.PORT || 4000;
 const dataDir = process.env.DATA_DIR || path.resolve(__dirname, "../data");
 const uploadDir = process.env.UPLOAD_DIR || path.resolve(__dirname, "../uploads");
+const musicDir = path.join(uploadDir, "music");
 const configPath = path.join(dataDir, "config.json");
 const guestsPath = path.join(dataDir, "guests.json");
 const clientDist = path.join(rootDir, "client/dist");
@@ -32,6 +33,8 @@ const defaultConfig = {
   locationAddress: "123 Duong Le Loi, Quan 1, TP. Ho Chi Minh",
   mapUrl: "",
   hostName: "Gia dinh Nguyen",
+  musicUrl: "",
+  musicTitle: "",
   introGreetingImage: "",
   introGreetingTemplate:
     "Chao {quan he} {nguoi duoc moi}, minh gui ban mot chiec thiep nho cho ngay tot nghiep that dac biet nay.",
@@ -69,6 +72,7 @@ const defaultConfig = {
 async function ensureStorage() {
   await fs.mkdir(dataDir, { recursive: true });
   await fs.mkdir(uploadDir, { recursive: true });
+  await fs.mkdir(musicDir, { recursive: true });
   try {
     await fs.access(configPath);
   } catch {
@@ -138,6 +142,51 @@ const upload = multer({
   }
 });
 
+const audioStorage = multer.diskStorage({
+  destination: async (_req, _file, cb) => {
+    try {
+      await fs.mkdir(musicDir, { recursive: true });
+      cb(null, musicDir);
+    } catch (error) {
+      cb(error);
+    }
+  },
+  filename: (_req, file, cb) => {
+    const ext = path.extname(file.originalname).toLowerCase();
+    const base = path
+      .basename(file.originalname, ext)
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/[^a-zA-Z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "")
+      .slice(0, 48) || "music";
+    cb(null, `${Date.now()}-${base}${ext}`);
+  }
+});
+
+const allowedAudioExts = new Set([".mp3", ".m4a", ".wav", ".ogg", ".aac", ".flac"]);
+
+const uploadAudio = multer({
+  storage: audioStorage,
+  limits: { fileSize: 25 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
+    const ext = path.extname(file.originalname).toLowerCase();
+    if (!file.mimetype.startsWith("audio/") && !allowedAudioExts.has(ext)) {
+      cb(new Error("Only audio files are allowed"));
+      return;
+    }
+    cb(null, true);
+  }
+});
+
+function musicTitleFromFilename(filename) {
+  return path
+    .basename(filename, path.extname(filename))
+    .replace(/^\d+-/, "")
+    .replace(/[-_]+/g, " ")
+    .trim();
+}
+
 const app = express();
 
 app.use(cors());
@@ -180,6 +229,33 @@ app.post("/api/upload", requireAdmin, upload.single("image"), (req, res) => {
   res.status(201).json({
     url: `/uploads/${req.file.filename}`,
     filename: req.file.filename
+  });
+});
+
+app.get("/api/music", requireAdmin, async (_req, res, next) => {
+  try {
+    await ensureStorage();
+    const files = await fs.readdir(musicDir);
+    res.json(
+      files
+        .filter((filename) => allowedAudioExts.has(path.extname(filename).toLowerCase()))
+        .sort((a, b) => b.localeCompare(a))
+        .map((filename) => ({
+          filename,
+          title: musicTitleFromFilename(filename),
+          url: `/uploads/music/${filename}`
+        }))
+    );
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post("/api/upload-audio", requireAdmin, uploadAudio.single("audio"), (req, res) => {
+  res.status(201).json({
+    url: `/uploads/music/${req.file.filename}`,
+    filename: req.file.filename,
+    title: musicTitleFromFilename(req.file.filename)
   });
 });
 

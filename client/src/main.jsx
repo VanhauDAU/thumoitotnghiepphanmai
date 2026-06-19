@@ -13,6 +13,7 @@ import {
   Link2,
   MapPin,
   Medal,
+  Music,
   Plus,
   Save,
   Sparkles,
@@ -57,6 +58,8 @@ const emptyConfig = {
   locationAddress: "",
   mapUrl: "",
   hostName: "",
+  musicUrl: "",
+  musicTitle: "",
   introGreetingImage: "",
   introGreetingTemplate: "Chào {quan hệ} {người được mời}, mình gửi bạn một chiếc thiệp nhỏ cho ngày tốt nghiệp thật đặc biệt này.",
   greeting: "",
@@ -385,6 +388,100 @@ function useScrollReveal() {
   }, []);
 }
 
+function useAutoInvitationScroll(enabled) {
+  useEffect(() => {
+    if (!enabled) return undefined;
+
+    const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (reduceMotion) return undefined;
+
+    const sections = Array.from(document.querySelectorAll("[data-autoscroll-section]"));
+    if (!sections.length) return undefined;
+
+    let cancelled = false;
+    let timeoutId = 0;
+    let rafId = 0;
+    const scrollElement = document.scrollingElement || document.documentElement;
+
+    const clearActive = () => {
+      sections.forEach((section) => section.classList.remove("auto-scroll-active"));
+    };
+
+    const cancel = () => {
+      cancelled = true;
+      window.clearTimeout(timeoutId);
+      window.cancelAnimationFrame(rafId);
+      clearActive();
+    };
+
+    const animateScrollTo = (targetY, duration) =>
+      new Promise((resolve) => {
+        const startY = window.scrollY;
+        const distance = targetY - startY;
+        const startTime = performance.now();
+
+        const step = (now) => {
+          if (cancelled) {
+            resolve();
+            return;
+          }
+
+          const progress = Math.min((now - startTime) / duration, 1);
+          const eased = progress < 0.5
+            ? 4 * progress * progress * progress
+            : 1 - Math.pow(-2 * progress + 2, 3) / 2;
+          window.scrollTo(0, startY + distance * eased);
+
+          if (progress < 1) {
+            rafId = window.requestAnimationFrame(step);
+            return;
+          }
+          resolve();
+        };
+
+        rafId = window.requestAnimationFrame(step);
+      });
+
+    const run = async () => {
+      for (const section of sections) {
+        if (cancelled) break;
+        clearActive();
+        section.classList.add("auto-scroll-active");
+
+        const rect = section.getBoundingClientRect();
+        const maxScroll = scrollElement.scrollHeight - window.innerHeight;
+        const targetY = Math.max(
+          0,
+          Math.min(window.scrollY + rect.top - Math.max(72, (window.innerHeight - rect.height) / 2), maxScroll)
+        );
+        const distance = Math.abs(targetY - window.scrollY);
+        const duration = Math.min(3400, Math.max(1800, distance * 2.8));
+
+        await animateScrollTo(targetY, duration);
+        if (cancelled) break;
+        await new Promise((resolve) => {
+          timeoutId = window.setTimeout(resolve, 1450);
+        });
+      }
+    };
+
+    const startId = window.setTimeout(run, 3200);
+    timeoutId = startId;
+
+    window.addEventListener("wheel", cancel, { passive: true, once: true });
+    window.addEventListener("touchstart", cancel, { passive: true, once: true });
+    window.addEventListener("keydown", cancel, { once: true });
+
+    return () => {
+      window.clearTimeout(startId);
+      window.removeEventListener("wheel", cancel);
+      window.removeEventListener("touchstart", cancel);
+      window.removeEventListener("keydown", cancel);
+      cancel();
+    };
+  }, [enabled]);
+}
+
 // ── Flip Digit ────────────────────────────────────────────────────────────────
 
 function FlipDigit({ value }) {
@@ -563,6 +660,7 @@ function Invitation({ config, isOpened }) {
   const countdown = useCountdown(config);
   const { guest, checked } = useGuestToken();
   useScrollReveal();
+  useAutoInvitationScroll(isOpened && checked);
 
   const photos = useMemo(() => {
     const merged = [...(config.heroImages || []), config.heroImage].filter(Boolean);
@@ -586,7 +684,7 @@ function Invitation({ config, isOpened }) {
 
       {/* Banner cá nhân hóa – CHỈ hiển thị khi có khách hợp lệ */}
       {guest && (
-        <section className="content-section guest-banner" data-reveal>
+        <section className="content-section guest-banner" data-reveal data-autoscroll-section>
           <div className="guest-banner-inner">
             <Heart size={20} className="guest-banner-icon" />
             <p>
@@ -597,7 +695,7 @@ function Invitation({ config, isOpened }) {
         </section>
       )}
 
-      <section className="content-section intro" data-reveal>
+      <section className="content-section intro" data-reveal data-autoscroll-section>
         <Sparkles size={22} />
         <p>{config.greeting}</p>
         <strong>{config.message}</strong>
@@ -605,7 +703,7 @@ function Invitation({ config, isOpened }) {
       </section>
 
       {config.privateMessage && (
-        <section className="content-section private-message" data-reveal>
+        <section className="content-section private-message" data-reveal data-autoscroll-section>
           <Heart size={22} />
           <div>
             <p className="eyebrow">Lời nhắn gửi riêng</p>
@@ -614,7 +712,7 @@ function Invitation({ config, isOpened }) {
         </section>
       )}
 
-      <section className="countdown-section" data-reveal>
+      <section className="countdown-section" data-reveal data-autoscroll-section>
         <div>
           <p className="eyebrow">{config.eventTitle}</p>
           <h2>{countdown.expired ? "Hẹn gặp tại buổi lễ" : "Đếm ngược đến ngày vui"}</h2>
@@ -629,21 +727,21 @@ function Invitation({ config, isOpened }) {
         </div>
       </section>
 
-      <section className="content-section event-grid" data-reveal>
+      <section className="content-section event-grid" data-reveal data-autoscroll-section>
         <Info icon={<CalendarDays />} label="Ngày" value={formatDate(config.eventDate)} />
         <Info icon={<Clock />} label="Thời gian" value={formatEventTime(config)} />
         <Info icon={<MapPin />} label={config.locationName} value={config.locationAddress} />
       </section>
 
       {(config.gallery || []).length > 0 && (
-        <section className="memory-gallery" data-reveal>
+        <section className="memory-gallery" data-reveal data-autoscroll-section>
           {(config.gallery || []).slice(0, 5).map((image, index) => (
             <img key={image} src={resolveAsset(image)} alt={`Khoảnh khắc ${index + 1}`} />
           ))}
         </section>
       )}
 
-      <section className="content-section memory-section" data-reveal>
+      <section className="content-section memory-section" data-reveal data-autoscroll-section>
         <div className="section-heading">
           <Medal size={22} />
           <h2>Kỷ niệm đáng nhớ</h2>
@@ -661,7 +759,7 @@ function Invitation({ config, isOpened }) {
         </div>
       </section>
 
-      <section className="content-section note-section" data-reveal>
+      <section className="content-section note-section" data-reveal data-autoscroll-section>
         <div className="section-heading">
           <Check size={22} />
           <h2>Lưu ý</h2>
@@ -673,7 +771,7 @@ function Invitation({ config, isOpened }) {
         </ul>
       </section>
 
-      <section className="content-section details" data-reveal>
+      <section className="content-section details" data-reveal data-autoscroll-section>
         <p>Dress code: {config.dressCode}</p>
         <p>Trân trọng, {config.hostName}</p>
       </section>
@@ -820,12 +918,33 @@ function Admin({ config, setConfig }) {
   const [adminToken, setAdminToken] = useState(() => localStorage.getItem("adminToken") || "");
   const [error, setError] = useState("");
   const [activeTab, setActiveTab] = useState("config"); // "config" | "guests"
+  const [musicTracks, setMusicTracks] = useState([]);
+  const [musicLoading, setMusicLoading] = useState(false);
 
   const updateField = (key, value) => {
     setConfig((current) => ({ ...current, [key]: value }));
   };
 
   const authHeaders = () => (adminToken ? { "x-admin-token": adminToken } : {});
+
+  const fetchMusicTracks = useCallback(async () => {
+    setMusicLoading(true);
+    try {
+      const res = await fetch("/api/music", { headers: authHeaders() });
+      if (!res.ok) throw new Error("Không tải được danh sách nhạc.");
+      setMusicTracks(await res.json());
+    } catch (musicError) {
+      setError(musicError.message);
+    } finally {
+      setMusicLoading(false);
+    }
+  }, [adminToken]);
+
+  useEffect(() => {
+    if (activeTab === "config") {
+      fetchMusicTracks();
+    }
+  }, [activeTab, fetchMusicTracks]);
 
   const uploadOneImage = async (file) => {
     if (!file) return;
@@ -860,6 +979,38 @@ function Admin({ config, setConfig }) {
     } catch (uploadError) {
       setError(uploadError.message);
     }
+  };
+
+  const uploadMusic = async (files) => {
+    const file = Array.from(files || [])[0];
+    if (!file) return;
+    setError("");
+    const formData = new FormData();
+    formData.append("audio", file);
+    try {
+      const res = await fetch("/api/upload-audio", {
+        method: "POST",
+        headers: authHeaders(),
+        body: formData
+      });
+      if (!res.ok) {
+        throw new Error("Không upload được nhạc. Kiểm tra admin token hoặc định dạng file.");
+      }
+      const track = await res.json();
+      setMusicTracks((current) => [track, ...current.filter((item) => item.url !== track.url)]);
+      setConfig((current) => ({ ...current, musicUrl: track.url, musicTitle: track.title }));
+    } catch (musicError) {
+      setError(musicError.message);
+    }
+  };
+
+  const selectMusic = (url) => {
+    const track = musicTracks.find((item) => item.url === url);
+    setConfig((current) => ({
+      ...current,
+      musicUrl: url,
+      musicTitle: track?.title || ""
+    }));
   };
 
   const removeHeroImage = (image) => {
@@ -1017,6 +1168,44 @@ function Admin({ config, setConfig }) {
                   onChange={(e) => uploadImages(e.target.files, "introGreetingImage")}
                 />
               </label>
+            </div>
+          </section>
+
+          <section className="admin-panel music-panel">
+            <PanelTitle icon={<Music size={20} />} title="Nhạc nền" />
+            <div className="music-editor">
+              <label className="music-select-field">
+                <span>Chọn nhạc</span>
+                <select value={config.musicUrl || ""} onChange={(e) => selectMusic(e.target.value)}>
+                  <option value="">Không phát nhạc</option>
+                  {musicTracks.map((track) => (
+                    <option key={track.url} value={track.url}>
+                      {track.title}
+                    </option>
+                  ))}
+                  {config.musicUrl && !musicTracks.some((track) => track.url === config.musicUrl) && (
+                    <option value={config.musicUrl}>{config.musicTitle || config.musicUrl}</option>
+                  )}
+                </select>
+              </label>
+              <label className="inline-upload">
+                <Music size={18} />
+                Thêm nhạc
+                <input
+                  type="file"
+                  accept="audio/mpeg,audio/mp3,audio/mp4,audio/x-m4a,audio/wav,audio/ogg,audio/aac,audio/flac"
+                  onChange={(e) => uploadMusic(e.target.files)}
+                />
+              </label>
+              {musicLoading && <small className="music-note">Đang tải danh sách nhạc...</small>}
+              {!musicLoading && musicTracks.length === 0 && (
+                <small className="music-note">Chưa có nhạc. Upload file MP3/M4A/WAV/OGG rồi chọn trong danh sách.</small>
+              )}
+              {config.musicUrl && (
+                <audio className="music-preview" controls src={resolveAsset(config.musicUrl)}>
+                  Trình duyệt không hỗ trợ phát nhạc.
+                </audio>
+              )}
             </div>
           </section>
 
@@ -1319,6 +1508,58 @@ function App() {
   const { guest, checked: guestChecked } = useGuestToken();
   const isAdmin = window.location.pathname.startsWith("/admin");
   const [isOpened, setIsOpened] = useState(false);
+  const audioRef = useRef(null);
+
+  const playMusic = useCallback(() => {
+    const audio = audioRef.current;
+    if (!audio || !config.musicUrl) return;
+    audio.volume = 0.55;
+    audio.muted = false;
+    audio.play().catch(() => {});
+  }, [config.musicUrl]);
+
+  const handleInvitationOpen = useCallback(() => {
+    setIsOpened(true);
+    playMusic();
+  }, [playMusic]);
+
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio) return;
+    audio.pause();
+    audio.load();
+  }, [config.musicUrl]);
+
+  useEffect(() => {
+    if (!config.musicUrl || isAdmin) return undefined;
+
+    const audio = audioRef.current;
+    const timers = [0, 250, 900, 1800].map((delay) => window.setTimeout(playMusic, delay));
+
+    const playAfterInteraction = () => {
+      playMusic();
+      window.removeEventListener("pointerdown", playAfterInteraction);
+      window.removeEventListener("keydown", playAfterInteraction);
+      window.removeEventListener("touchstart", playAfterInteraction);
+    };
+
+    window.addEventListener("pointerdown", playAfterInteraction, { once: true });
+    window.addEventListener("keydown", playAfterInteraction, { once: true });
+    window.addEventListener("touchstart", playAfterInteraction, { once: true });
+    document.addEventListener("visibilitychange", playMusic);
+    audio?.addEventListener("canplay", playMusic);
+    audio?.addEventListener("loadeddata", playMusic);
+
+    return () => {
+      timers.forEach((timer) => window.clearTimeout(timer));
+      window.removeEventListener("pointerdown", playAfterInteraction);
+      window.removeEventListener("keydown", playAfterInteraction);
+      window.removeEventListener("touchstart", playAfterInteraction);
+      document.removeEventListener("visibilitychange", playMusic);
+      audio?.removeEventListener("canplay", playMusic);
+      audio?.removeEventListener("loadeddata", playMusic);
+    };
+  }, [config.musicUrl, isAdmin, playMusic]);
 
   const page = useMemo(() => {
     if (loading || !guestChecked) return <div className="loading">Đang tải...</div>;
@@ -1328,14 +1569,30 @@ function App() {
         <EnvelopeScreen
           config={config}
           guest={guest}
-          onOpen={() => setIsOpened(true)}
+          onOpen={handleInvitationOpen}
         />
       );
     }
     return <Invitation config={config} isOpened={isOpened} />;
-  }, [config, isAdmin, loading, setConfig, isOpened, guest, guestChecked]);
+  }, [config, isAdmin, loading, setConfig, isOpened, guest, guestChecked, handleInvitationOpen]);
 
-  return page;
+  return (
+    <>
+      {config.musicUrl && !isAdmin && (
+        <audio
+          ref={audioRef}
+          src={resolveAsset(config.musicUrl)}
+          preload="auto"
+          autoPlay
+          playsInline
+          loop
+          onCanPlay={playMusic}
+          onLoadedData={playMusic}
+        />
+      )}
+      {page}
+    </>
+  );
 }
 
 createRoot(document.getElementById("root")).render(<App />);
