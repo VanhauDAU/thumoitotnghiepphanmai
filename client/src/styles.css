@@ -1351,6 +1351,40 @@ a {
   min-width: 0;
 }
 
+.guest-editing-alert {
+  grid-column: 1 / -1;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: #f0faf8;
+  border-left: 4px solid #2e5961;
+  padding: 10px 16px;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  color: #2e5961;
+}
+
+.guest-editing-cancel-link {
+  border: 0;
+  background: transparent;
+  color: #ff4d6d;
+  font-weight: 700;
+  cursor: pointer;
+  padding: 0;
+  font-size: 0.85rem;
+  transition: opacity 180ms ease;
+}
+
+.guest-editing-cancel-link:hover {
+  opacity: 0.8;
+}
+
+.guest-form-actions {
+  display: flex;
+  gap: 12px;
+  width: 100%;
+}
+
 .guest-create-btn {
   display: inline-flex;
   align-items: center;
@@ -1365,7 +1399,7 @@ a {
   font-weight: 800;
   font-size: 0.95rem;
   transition: background 180ms ease, transform 180ms ease, opacity 180ms ease;
-  width: 100%;
+  flex: 1;
 }
 
 .guest-create-btn:hover:not(:disabled) {
@@ -1376,6 +1410,27 @@ a {
 .guest-create-btn:disabled {
   opacity: 0.55;
   cursor: not-allowed;
+}
+
+.guest-cancel-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 20px;
+  min-height: 44px;
+  border: 1px solid #c9e4e0;
+  border-radius: 999px;
+  background: #fff;
+  color: #2e5961;
+  font-weight: 800;
+  font-size: 0.95rem;
+  transition: background 180ms ease, transform 180ms ease;
+  flex: 1;
+}
+
+.guest-cancel-btn:hover {
+  background: #f0faf8;
+  transform: translateY(-1px);
 }
 
 .guest-list {
@@ -1507,6 +1562,24 @@ a {
   background: #2e5961;
   color: #fff;
   border-color: #2e5961;
+}
+
+.edit-guest-btn {
+  width: 36px;
+  height: 36px;
+  border: 1px solid #c9e4e0;
+  border-radius: 50%;
+  background: #f0faf8;
+  color: #2e5961;
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  transition: background 180ms ease, transform 180ms ease;
+}
+
+.edit-guest-btn:hover {
+  background: #d8f0ed;
+  transform: scale(1.08);
 }
 
 .delete-guest-btn {

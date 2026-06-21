@@ -335,6 +335,33 @@ app.delete("/api/guests/:id", requireAdmin, async (req, res, next) => {
   }
 });
 
+// Admin: cập nhật khách mời
+app.put("/api/guests/:id", requireAdmin, async (req, res, next) => {
+  try {
+    const { name, relation, photoUrl, privateMessage } = req.body;
+    if (!name || !name.trim()) {
+      return res.status(400).json({ message: "Tên khách mời là bắt buộc" });
+    }
+    const guests = await readGuests();
+    const index = guests.findIndex((g) => g.id === req.params.id);
+    if (index === -1) {
+      return res.status(404).json({ message: "Không tìm thấy khách mời" });
+    }
+    guests[index] = {
+      ...guests[index],
+      name: name.trim(),
+      relation: (relation || "Bạn").trim(),
+      photoUrl: (photoUrl !== undefined ? photoUrl : guests[index].photoUrl || "").trim(),
+      privateMessage: (privateMessage !== undefined ? privateMessage : guests[index].privateMessage || "").trim(),
+      updatedAt: new Date().toISOString()
+    };
+    await writeGuests(guests);
+    res.json(guests[index]);
+  } catch (error) {
+    next(error);
+  }
+});
+
 // ── Static ────────────────────────────────────────────────────────────────────
 
 app.use(express.static(clientDist));

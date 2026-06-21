@@ -17,6 +17,7 @@ import {
   Mic,
   MicOff,
   Music,
+  Pencil,
   Play,
   Plus,
   Save,
@@ -1638,12 +1639,15 @@ function GuestManager({ authHeaders }) {
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState("");
   const [copiedId, setCopiedId] = useState(null);
+  const [editingGuest, setEditingGuest] = useState(null);
 
   const baseUrl = `${window.location.protocol}//${window.location.host}`;
 
   useEffect(() => {
     return () => {
-      if (photoSource) URL.revokeObjectURL(photoSource);
+      if (photoSource && photoSource.startsWith("blob:")) {
+        URL.revokeObjectURL(photoSource);
+      }
     };
   }, [photoSource]);
 
@@ -1667,14 +1671,18 @@ function GuestManager({ authHeaders }) {
   const selectGuestPhoto = (files) => {
     const file = Array.from(files || [])[0];
     if (!file) return;
-    if (photoSource) URL.revokeObjectURL(photoSource);
+    if (photoSource && photoSource.startsWith("blob:")) {
+      URL.revokeObjectURL(photoSource);
+    }
     setPhotoSource(URL.createObjectURL(file));
     setPhotoName(file.name || "guest-photo.jpg");
     setCrop({ scale: 1, offsetX: 0, offsetY: 0 });
   };
 
   const clearGuestPhoto = () => {
-    if (photoSource) URL.revokeObjectURL(photoSource);
+    if (photoSource && photoSource.startsWith("blob:")) {
+      URL.revokeObjectURL(photoSource);
+    }
     setPhotoSource("");
     setPhotoName("");
     setCrop({ scale: 1, offsetX: 0, offsetY: 0 });
@@ -1682,19 +1690,25 @@ function GuestManager({ authHeaders }) {
 
   const uploadGuestPhoto = async () => {
     if (!photoSource) return "";
-    const croppedFile = await cropImageToFile(photoSource, crop, `${photoName.replace(/\.[^.]+$/, "") || "guest-photo"}.jpg`);
-    const formData = new FormData();
-    formData.append("image", croppedFile);
-    const res = await fetch("/api/upload", {
-      method: "POST",
-      headers: authHeaders(),
-      body: formData
-    });
-    if (!res.ok) {
-      throw new Error("Không upload được ảnh khách mời.");
+    if (photoSource.startsWith("blob:")) {
+      const croppedFile = await cropImageToFile(photoSource, crop, `${photoName.replace(/\.[^.]+$/, "") || "guest-photo"}.jpg`);
+      const formData = new FormData();
+      formData.append("image", croppedFile);
+      const res = await fetch("/api/upload", {
+        method: "POST",
+        headers: authHeaders(),
+        body: formData
+      });
+      if (!res.ok) {
+        throw new Error("Không upload được ảnh khách mời.");
+      }
+      const data = await res.json();
+      return data.url || "";
     }
-    const data = await res.json();
-    return data.url || "";
+    if (photoSource.startsWith("/uploads/")) {
+      return photoSource;
+    }
+    return "";
   };
 
   const createGuest = async (e) => {
@@ -1730,6 +1744,55 @@ function GuestManager({ authHeaders }) {
     }
   };
 
+  const startEdit = (guest) => {
+    setEditingGuest(guest);
+    setName(guest.name);
+    setRelation(guest.relation || "Bạn");
+    setPrivateMessage(guest.privateMessage || "");
+    setPhotoSource(guest.photoUrl || "");
+    setPhotoName("");
+    setCrop({ scale: 1, offsetX: 0, offsetY: 0 });
+  };
+
+  const cancelEdit = () => {
+    setEditingGuest(null);
+    setName("");
+    setRelation("Bạn");
+    setPrivateMessage("");
+    clearGuestPhoto();
+  };
+
+  const updateGuest = async (e) => {
+    e.preventDefault();
+    if (!name.trim() || !editingGuest) return;
+    setCreating(true);
+    setError("");
+    try {
+      const photoUrl = await uploadGuestPhoto();
+      const res = await fetch(`/api/guests/${editingGuest.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", ...authHeaders() },
+        body: JSON.stringify({
+          name: name.trim(),
+          relation,
+          photoUrl,
+          privateMessage: privateMessage.trim()
+        })
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.message || "Không cập nhật được khách mời");
+      }
+      const updated = await res.json();
+      setGuests((prev) => prev.map((g) => (g.id === updated.id ? updated : g)));
+      cancelEdit();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setCreating(false);
+    }
+  };
+
   const deleteGuest = async (id) => {
     setError("");
     try {
@@ -1739,6 +1802,9 @@ function GuestManager({ authHeaders }) {
       });
       if (!res.ok) throw new Error("Không xóa được khách");
       setGuests((prev) => prev.filter((g) => g.id !== id));
+      if (editingGuest && editingGuest.id === id) {
+        cancelEdit();
+      }
     } catch (err) {
       setError(err.message);
     }
@@ -1764,7 +1830,13 @@ function GuestManager({ authHeaders }) {
       {error && <p className="admin-error">{error}</p>}
 
       {/* Form tạo khách mới */}
-      <form className="guest-form" onSubmit={createGuest}>
+      <form className="guest-form" onSubmit={editingGuest ? updateGuest : createGuest}>
+        {editingGuest && (
+          <div className="guest-editing-alert">
+            <span>Đang chỉnh sửa khách mời: <strong>{editingGuest.name}</strong></span>
+            <button type="button" className="guest-editing-cancel-link" onClick={cancelEdit}>Hủy chỉnh sửa</button>
+          </div>
+        )}
         <div className="guest-form-row">
           <label className="guest-form-field">
             <span>Tên khách mời</span>
@@ -1859,10 +1931,17 @@ function GuestManager({ authHeaders }) {
             />
           </label>
         </div>
-        <button type="submit" disabled={creating || !name.trim()} className="guest-create-btn">
-          <Link2 size={18} />
-          {creating ? "Đang tạo..." : "Tạo link mời"}
-        </button>
+        <div className="guest-form-actions">
+          <button type="submit" disabled={creating || !name.trim()} className="guest-create-btn">
+            {editingGuest ? <Save size={18} /> : <Link2 size={18} />}
+            {creating ? (editingGuest ? "Đang lưu..." : "Đang tạo...") : (editingGuest ? "Lưu thay đổi" : "Tạo link mời")}
+          </button>
+          {editingGuest && (
+            <button type="button" className="guest-cancel-btn" onClick={cancelEdit}>
+              Hủy
+            </button>
+          )}
+        </div>
       </form>
 
       {/* Danh sách khách */}
@@ -1909,6 +1988,14 @@ function GuestManager({ authHeaders }) {
                 >
                   {copiedId === guest.token ? <Check size={16} /> : <Copy size={16} />}
                   {copiedId === guest.token ? "Đã sao chép" : "Sao chép"}
+                </button>
+                <button
+                  type="button"
+                  className="edit-guest-btn"
+                  onClick={() => startEdit(guest)}
+                  title="Sửa thông tin"
+                >
+                  <Pencil size={16} />
                 </button>
                 <button
                   type="button"
