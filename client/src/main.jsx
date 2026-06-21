@@ -805,10 +805,7 @@ function EnvelopeScreen({ config, guest, onOpen }) {
           <span className="friend-name">{guest?.name || "Bạn thân"}</span>
         </div>
 
-        {/* Gợi ý chạm */}
-        <p className="env-hint">
-          {greetingDone ? "Chạm vào phong bì để mở thiệp ↘" : ""}
-        </p>
+        {/* Gợi ý chạm đã được xóa theo yêu cầu */}
 
       </div>{/* /env-content */}
 
