@@ -5,6 +5,7 @@ import {
   CalendarDays,
   Camera,
   Check,
+  Circle,
   Clock,
   Copy,
   GraduationCap,
@@ -13,11 +14,16 @@ import {
   Link2,
   MapPin,
   Medal,
+  Mic,
+  MicOff,
   Music,
+  Play,
   Plus,
   Save,
   Sparkles,
+  Square,
   Trash2,
+  Upload,
   Users
 } from "lucide-react";
 import "./styles.css";
@@ -61,7 +67,10 @@ const emptyConfig = {
   musicUrl: "",
   musicTitle: "",
   musicVolume: 0.6,
+  openPromptAudioUrl: "",
+  openPromptAudioTitle: "",
   introGreetingImage: "",
+  hostPortraitImage: "",
   introGreetingTemplate: "Chào {quan hệ} {người được mời}, mình gửi bạn một chiếc thiệp nhỏ cho ngày tốt nghiệp thật đặc biệt này.",
   greeting: "",
   message: "",
@@ -123,6 +132,40 @@ function resolveAsset(url) {
   if (!url) return "";
   if (url.startsWith("http") || url.startsWith("data:")) return url;
   return url;
+}
+
+function loadImage(src) {
+  return new Promise((resolve, reject) => {
+    const image = new Image();
+    image.onload = () => resolve(image);
+    image.onerror = reject;
+    image.src = src;
+  });
+}
+
+async function cropImageToFile(src, { scale, offsetX, offsetY }, filename = "guest-photo.jpg") {
+  const image = await loadImage(src);
+  const size = 720;
+  const previewSize = 180;
+  const canvas = document.createElement("canvas");
+  const context = canvas.getContext("2d");
+  canvas.width = size;
+  canvas.height = size;
+
+  const coverScale = Math.max(size / image.naturalWidth, size / image.naturalHeight) * scale;
+  const width = image.naturalWidth * coverScale;
+  const height = image.naturalHeight * coverScale;
+  const ratio = size / previewSize;
+  const dx = (size - width) / 2 + offsetX * ratio;
+  const dy = (size - height) / 2 + offsetY * ratio;
+
+  context.fillStyle = "#fffaf4";
+  context.fillRect(0, 0, size, size);
+  context.drawImage(image, dx, dy, width, height);
+
+  const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.9));
+  if (!blob) throw new Error("Không crop được ảnh.");
+  return new File([blob], filename, { type: "image/jpeg" });
 }
 
 function getEventDateTime(config) {
@@ -625,12 +668,18 @@ function EnvelopeScreen({ config, guest, onOpen }) {
   const [opening, setOpening] = useState(false);
   const [confetti, setConfetti] = useState(false);
   const envelopeRef = useRef(null);
-  const wrapRef = useRef(null);
+  const promptAudioRef = useRef(null);
   const greetingText = useMemo(
     () => applyGreetingTemplate(config.introGreetingTemplate, guest),
     [config.introGreetingTemplate, guest]
   );
   const { displayed, done: greetingDone } = useTypewriter(greetingText);
+  const featuredImage = useMemo(() => {
+    const merged = [...(config.heroImages || []), config.heroImage].filter(Boolean);
+    return merged[0] || config.introGreetingImage || "";
+  }, [config.heroImage, config.heroImages, config.introGreetingImage]);
+  const hostPortrait = config.hostPortraitImage || featuredImage;
+  const guestPortrait = guest?.photoUrl || "";
 
   // Sparkle positions (stable, generated once)
   const sparkles = useMemo(() =>
@@ -646,11 +695,25 @@ function EnvelopeScreen({ config, guest, onOpen }) {
 
   const handleOpen = () => {
     if (!greetingDone || opening) return;
+    promptAudioRef.current?.pause();
     playOpenSound();
     setOpening(true);
     setConfetti(true);
-    setTimeout(() => onOpen(), 2450);
+    setTimeout(() => onOpen(), 3400);
   };
+
+  useEffect(() => {
+    if (!greetingDone || !config.openPromptAudioUrl || opening) return undefined;
+    // Delay = GIF animation duration so audio plays right as GIF arrives
+    const delay = config.introGreetingImage ? 5200 : 600;
+    const timer = window.setTimeout(() => {
+      const audio = promptAudioRef.current;
+      if (!audio) return;
+      audio.currentTime = 0;
+      audio.play().catch(() => {});
+    }, delay);
+    return () => window.clearTimeout(timer);
+  }, [config.introGreetingImage, config.openPromptAudioUrl, greetingDone, opening]);
 
   // 3D mouse tilt
   const onMouseMove = useCallback((e) => {
@@ -670,39 +733,87 @@ function EnvelopeScreen({ config, guest, onOpen }) {
 
   return (
     <div className={`envelope-screen${opening ? " opening" : ""}${greetingDone ? " greeting-done" : ""}`}>
-      {/* Nền rơi icon */}
+      {config.openPromptAudioUrl && (
+        <audio ref={promptAudioRef} preload="auto" src={resolveAsset(config.openPromptAudioUrl)} />
+      )}
+
+      {/* Nền confetti tốt nghiệp nhỏ */}
       <div className="env-bg-icons" aria-hidden="true">
-        {Array.from({ length: 18 }).map((_, i) => (
+        {Array.from({ length: 24 }).map((_, i) => (
           <span key={i} className={`env-bg-icon env-bg-icon-${i + 1}`}>
-            <GraduationCap size={i % 4 === 0 ? 28 : 18} />
+            <GraduationCap size={i % 3 === 0 ? 22 : 16} />
           </span>
         ))}
       </div>
 
-      {/* Text tiêu đề phía trên */}
-      <div className="env-header">
-        <p className="eyebrow" style={{ color: "rgb(255 246 228 / 80%)" }}>Bạn có một thư mời</p>
-        <h1 className="env-name">{config.graduateName || "Lễ Tốt Nghiệp"}</h1>
-        <div className="intro-greeting-card">
-          {config.introGreetingImage && (
-            <img
-              className="intro-greeting-image"
-              src={resolveAsset(config.introGreetingImage)}
-              alt=""
-              aria-hidden="true"
-            />
-          )}
-          <p className="typewriter-greeting">
+      {/* GIF nhân vật chạy vào từ bên trái */}
+      {config.introGreetingImage && greetingDone && (
+        <img
+          className={`env-messenger-gif${opening ? " env-messenger-leaving" : ""}`}
+          src={resolveAsset(config.introGreetingImage)}
+          alt=""
+          aria-hidden="true"
+        />
+      )}
+
+      {/* ── Nội dung chính ── */}
+      <div className="env-content">
+
+        {/* 1. Tiêu đề — cân giữa, không khoảng trống trên */}
+        <div className="env-header">
+          <span className="env-badge">🎓 Tốt nghiệp</span>
+          <h1 className="env-name">{config.graduateName || "Graduation"}</h1>
+        </div>
+
+        {/* 2. Lời chào typewriter */}
+        <div className="env-greeting-box">
+          <p className="env-touch-text">
             {displayed}
             {!greetingDone && <span className="typewriter-caret" aria-hidden="true" />}
           </p>
         </div>
-      </div>
 
-      {/* Phong bì với 3D tilt */}
+        {/* 3. Bạn bè — casual style */}
+        <div className="friend-stage">
+          {/* Avatar chủ */}
+          <div className="friend-avatar friend-avatar--host">
+            {hostPortrait
+              ? <img src={resolveAsset(hostPortrait)} alt="" />
+              : <GraduationCap size={32} />}
+            <span className="friend-badge-role">📤 Gửi</span>
+          </div>
+
+          {/* Kết nối */}
+          <div className="friend-connector">
+            <span className="friend-connector-icon">🎉</span>
+          </div>
+
+          {/* Avatar khách */}
+          <div className="friend-avatar friend-avatar--guest">
+            {guestPortrait
+              ? <img src={resolveAsset(guestPortrait)} alt="" />
+              : <Users size={28} />}
+            <span className="friend-badge-role">📬 Nhận</span>
+          </div>
+        </div>
+
+        {/* Tên hai người */}
+        <div className="friend-names">
+          <span className="friend-name">{config.hostName || config.graduateName || "Bạn"}</span>
+          <span className="friend-sep">→</span>
+          <span className="friend-name">{guest?.name || "Bạn thân"}</span>
+        </div>
+
+        {/* Gợi ý chạm */}
+        <p className="env-hint">
+          {greetingDone ? "Chạm vào phong bì để mở thiệp ↘" : ""}
+        </p>
+
+      </div>{/* /env-content */}
+
+      {/* 5. Phong bì mini cố định góc phải dưới */}
       <div
         className="envelope-wrap"
-        ref={wrapRef}
         onMouseMove={onMouseMove}
         onMouseLeave={onMouseLeave}
       >
@@ -711,7 +822,7 @@ function EnvelopeScreen({ config, guest, onOpen }) {
           ref={envelopeRef}
           role="button"
           tabIndex={greetingDone ? 0 : -1}
-          aria-label="Click vào tấm thiệp để mở"
+          aria-label="Chạm vào phong bì để mở thiệp"
           onClick={handleOpen}
           onKeyDown={(event) => {
             if (event.key === "Enter" || event.key === " ") {
@@ -719,29 +830,23 @@ function EnvelopeScreen({ config, guest, onOpen }) {
               handleOpen();
             }
           }}
-          style={{ transition: opening ? "transform 0.9s ease" : "transform 0.12s ease" }}
         >
           <div className="letter-card-reveal">
-            <p>Thư mời tốt nghiệp</p>
-            <strong>{config.graduateName || "Lễ Tốt Nghiệp"}</strong>
-            {guest && <span>Gửi {guest.relation} {guest.name}</span>}
+            {featuredImage ? (
+              <img src={resolveAsset(featuredImage)} alt={config.graduateName || "Ảnh thư mời"} />
+            ) : (
+              <div className="letter-card-placeholder">
+                <GraduationCap size={42} />
+              </div>
+            )}
           </div>
-          {/* Nắp phong bì */}
-          <div className="envelope-flap">
-            <div className="envelope-flap-inner" />
-          </div>
-          {/* Thân phong bì */}
+          <div className="envelope-top-diamond" />
+          <div className="envelope-back" />
           <div className="envelope-body">
             <div className="envelope-seal">
-              <GraduationCap size={26} />
+              <Sparkles size={24} />
             </div>
           </div>
-          {/* Thẻ nhỏ bên trong ló ra khi mở */}
-          <div className="envelope-card-peek">
-            <Sparkles size={14} />
-            <span>Thư mời tốt nghiệp</span>
-          </div>
-          {/* Sparkle dots lung linh */}
           {sparkles.map((s) => (
             <div
               key={s.id}
@@ -757,26 +862,22 @@ function EnvelopeScreen({ config, guest, onOpen }) {
             />
           ))}
         </div>
-        {/* Confetti nổ từ giữa phong bì */}
         <ConfettiBurst active={confetti} />
-        <div className="flying-paper-plane" aria-hidden="true" />
       </div>
-      <Fireworks active={confetti} />
 
-      <p className="env-hint">
-        {greetingDone ? "Click vào tấm thiệp để mở" : "Lời chào đang được gửi đến bạn..."}
-      </p>
+      <Fireworks active={confetti} />
     </div>
   );
 }
 
 // ── Invitation ────────────────────────────────────────────────────────────────
 
-function Invitation({ config, isOpened }) {
+function Invitation({ config, isOpened, isMuted, onToggleMute, hasMusic }) {
   const countdown = useCountdown(config);
   const { guest, checked } = useGuestToken();
   useScrollReveal();
   useAutoInvitationScroll(isOpened && checked);
+  const displayedPrivateMessage = guest?.privateMessage || config.privateMessage;
 
   const photos = useMemo(() => {
     const merged = [...(config.heroImages || []), config.heroImage].filter(Boolean);
@@ -787,6 +888,23 @@ function Invitation({ config, isOpened }) {
 
   return (
     <main className={`invitation-shell${isOpened ? " card-revealed" : ""}`}>
+
+      {/* Nút tắt/mở nhạc — góc trên phải */}
+      {hasMusic && (
+        <button
+          type="button"
+          className={`music-toggle-btn${isMuted ? " music-toggle-btn--muted" : ""}`}
+          onClick={onToggleMute}
+          aria-label={isMuted ? "Bật nhạc" : "Tắt nhạc"}
+          title={isMuted ? "Bật nhạc" : "Tắt nhạc"}
+        >
+          <span className="music-disc" aria-hidden="true">
+            <Music size={18} />
+          </span>
+          {isMuted && <span className="music-mute-line" aria-hidden="true" />}
+        </button>
+      )}
+
       <section className="hero">
         <FallingGraduationIcons />
         <PhotoCarousel photos={photos} graduateName={config.graduateName} />
@@ -802,7 +920,11 @@ function Invitation({ config, isOpened }) {
       {guest && (
         <section className="content-section guest-banner" data-reveal data-autoscroll-section>
           <div className="guest-banner-inner">
-            <Heart size={20} className="guest-banner-icon" />
+            {guest.photoUrl ? (
+              <img className="guest-banner-photo" src={resolveAsset(guest.photoUrl)} alt={guest.name} />
+            ) : (
+              <Heart size={20} className="guest-banner-icon" />
+            )}
             <p>
               Kính mời <span className="guest-relation">{guest.relation}</span>{" "}
               <strong className="guest-name">{guest.name}</strong>
@@ -818,12 +940,12 @@ function Invitation({ config, isOpened }) {
         {config.description && <span>{config.description}</span>}
       </section>
 
-      {config.privateMessage && (
+      {displayedPrivateMessage && (
         <section className="content-section private-message" data-reveal data-autoscroll-section>
           <Heart size={22} />
           <div>
             <p className="eyebrow">Lời nhắn gửi riêng</p>
-            <strong>{config.privateMessage}</strong>
+            <strong>{displayedPrivateMessage}</strong>
           </div>
         </section>
       )}
@@ -1089,6 +1211,8 @@ function Admin({ config, setConfig }) {
         if (!config.heroImage && urls[0]) updateField("heroImage", urls[0]);
       } else if (target === "introGreetingImage") {
         updateField("introGreetingImage", urls[0] || "");
+      } else if (target === "hostPortraitImage") {
+        updateField("hostPortraitImage", urls[0] || "");
       } else {
         updateField("gallery", [...(config.gallery || []), ...urls]);
       }
@@ -1117,6 +1241,55 @@ function Admin({ config, setConfig }) {
       setConfig((current) => ({ ...current, musicUrl: track.url, musicTitle: track.title }));
     } catch (musicError) {
       setError(musicError.message);
+    }
+  };
+
+  const uploadOpenPromptAudio = async (files) => {
+    const file = Array.from(files || [])[0];
+    if (!file) return;
+    setError("");
+    const formData = new FormData();
+    formData.append("audio", file);
+    try {
+      const res = await fetch("/api/upload-audio", {
+        method: "POST",
+        headers: authHeaders(),
+        body: formData
+      });
+      if (!res.ok) {
+        throw new Error("Không upload được âm thanh lời gọi mở thiệp.");
+      }
+      const track = await res.json();
+      setConfig((current) => ({
+        ...current,
+        openPromptAudioUrl: track.url,
+        openPromptAudioTitle: track.title
+      }));
+    } catch (promptAudioError) {
+      setError(promptAudioError.message);
+    }
+  };
+
+  const uploadOpenPromptAudioBlob = async (blob) => {
+    setError("");
+    const formData = new FormData();
+    const fileName = `recording_${Date.now()}.webm`;
+    formData.append("audio", blob, fileName);
+    try {
+      const res = await fetch("/api/upload-audio", {
+        method: "POST",
+        headers: authHeaders(),
+        body: formData
+      });
+      if (!res.ok) throw new Error("Không lưu được bản ghi âm.");
+      const track = await res.json();
+      setConfig((current) => ({
+        ...current,
+        openPromptAudioUrl: track.url,
+        openPromptAudioTitle: track.title || "Ghi âm"
+      }));
+    } catch (recErr) {
+      setError(recErr.message);
     }
   };
 
@@ -1287,6 +1460,52 @@ function Admin({ config, setConfig }) {
             </div>
           </section>
 
+          <section className="admin-panel prompt-audio-panel">
+            <PanelTitle icon={<Mic size={20} />} title="Âm thanh kêu gọi mở thiệp" />
+            <VoiceRecorder
+              currentUrl={config.openPromptAudioUrl}
+              onUploadFile={(files) => uploadOpenPromptAudio(files)}
+              onSaveRecording={(blob) => uploadOpenPromptAudioBlob(blob)}
+              onDelete={() => {
+                updateField("openPromptAudioUrl", "");
+                updateField("openPromptAudioTitle", "");
+              }}
+            />
+          </section>
+
+          <section className="admin-panel intro-assets-panel">
+            <PanelTitle icon={<ImagePlus size={20} />} title="Ảnh trang mở thiệp" />
+            <div className="intro-assets-grid">
+              {[
+                ["hostPortraitImage", "Ảnh người mời"]
+              ].map(([key, label]) => (
+                <div className="intro-asset-card" key={key}>
+                  <span>{label}</span>
+                  {config[key] ? (
+                    <div className="intro-asset-preview">
+                      <img src={resolveAsset(config[key])} alt={label} />
+                      <button
+                        type="button"
+                        className="delete-image-button"
+                        onClick={() => updateField(key, "")}
+                        title="Xóa ảnh"
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="intro-asset-empty">Chưa có ảnh</div>
+                  )}
+                  <label className="inline-upload">
+                    <ImagePlus size={18} />
+                    {config[key] ? "Thay ảnh" : "Thêm ảnh"}
+                    <input type="file" accept="image/*" onChange={(e) => uploadImages(e.target.files, key)} />
+                  </label>
+                </div>
+              ))}
+            </div>
+          </section>
+
           <section className="admin-panel music-panel">
             <PanelTitle icon={<Music size={20} />} title="Nhạc nền" />
             <div className="music-editor">
@@ -1412,11 +1631,21 @@ function GuestManager({ authHeaders }) {
   const [loading, setLoading] = useState(true);
   const [name, setName] = useState("");
   const [relation, setRelation] = useState("Bạn");
+  const [privateMessage, setPrivateMessage] = useState("");
+  const [photoSource, setPhotoSource] = useState("");
+  const [photoName, setPhotoName] = useState("");
+  const [crop, setCrop] = useState({ scale: 1, offsetX: 0, offsetY: 0 });
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState("");
   const [copiedId, setCopiedId] = useState(null);
 
   const baseUrl = `${window.location.protocol}//${window.location.host}`;
+
+  useEffect(() => {
+    return () => {
+      if (photoSource) URL.revokeObjectURL(photoSource);
+    };
+  }, [photoSource]);
 
   const fetchGuests = async () => {
     setLoading(true);
@@ -1435,16 +1664,55 @@ function GuestManager({ authHeaders }) {
     fetchGuests();
   }, []);
 
+  const selectGuestPhoto = (files) => {
+    const file = Array.from(files || [])[0];
+    if (!file) return;
+    if (photoSource) URL.revokeObjectURL(photoSource);
+    setPhotoSource(URL.createObjectURL(file));
+    setPhotoName(file.name || "guest-photo.jpg");
+    setCrop({ scale: 1, offsetX: 0, offsetY: 0 });
+  };
+
+  const clearGuestPhoto = () => {
+    if (photoSource) URL.revokeObjectURL(photoSource);
+    setPhotoSource("");
+    setPhotoName("");
+    setCrop({ scale: 1, offsetX: 0, offsetY: 0 });
+  };
+
+  const uploadGuestPhoto = async () => {
+    if (!photoSource) return "";
+    const croppedFile = await cropImageToFile(photoSource, crop, `${photoName.replace(/\.[^.]+$/, "") || "guest-photo"}.jpg`);
+    const formData = new FormData();
+    formData.append("image", croppedFile);
+    const res = await fetch("/api/upload", {
+      method: "POST",
+      headers: authHeaders(),
+      body: formData
+    });
+    if (!res.ok) {
+      throw new Error("Không upload được ảnh khách mời.");
+    }
+    const data = await res.json();
+    return data.url || "";
+  };
+
   const createGuest = async (e) => {
     e.preventDefault();
     if (!name.trim()) return;
     setCreating(true);
     setError("");
     try {
+      const photoUrl = await uploadGuestPhoto();
       const res = await fetch("/api/guests", {
         method: "POST",
         headers: { "Content-Type": "application/json", ...authHeaders() },
-        body: JSON.stringify({ name: name.trim(), relation })
+        body: JSON.stringify({
+          name: name.trim(),
+          relation,
+          photoUrl,
+          privateMessage: privateMessage.trim()
+        })
       });
       if (!res.ok) {
         const data = await res.json();
@@ -1453,6 +1721,8 @@ function GuestManager({ authHeaders }) {
       const guest = await res.json();
       setGuests((prev) => [guest, ...prev]);
       setName("");
+      setPrivateMessage("");
+      clearGuestPhoto();
     } catch (err) {
       setError(err.message);
     } finally {
@@ -1515,6 +1785,80 @@ function GuestManager({ authHeaders }) {
             </select>
           </label>
         </div>
+        <div className="guest-form-row guest-form-row-wide">
+          <div className="guest-photo-editor">
+            <label className="guest-photo-picker">
+              {photoSource ? (
+                <img
+                  className="guest-photo-crop-preview"
+                  src={photoSource}
+                  alt="Preview ảnh khách mời"
+                  style={{
+                    transform: `translate(${crop.offsetX}px, ${crop.offsetY}px) scale(${crop.scale})`
+                  }}
+                />
+              ) : (
+                <span className="guest-photo-placeholder">
+                  <ImagePlus size={26} />
+                  <small>Chọn ảnh</small>
+                </span>
+              )}
+              <input type="file" accept="image/*" onChange={(e) => selectGuestPhoto(e.target.files)} />
+            </label>
+            <div className="guest-crop-controls">
+              <label>
+                <span>Zoom</span>
+                <input
+                  type="range"
+                  min="1"
+                  max="2.4"
+                  step="0.05"
+                  value={crop.scale}
+                  onChange={(e) => setCrop((current) => ({ ...current, scale: Number(e.target.value) }))}
+                  disabled={!photoSource}
+                />
+              </label>
+              <label>
+                <span>Ngang</span>
+                <input
+                  type="range"
+                  min="-70"
+                  max="70"
+                  step="1"
+                  value={crop.offsetX}
+                  onChange={(e) => setCrop((current) => ({ ...current, offsetX: Number(e.target.value) }))}
+                  disabled={!photoSource}
+                />
+              </label>
+              <label>
+                <span>Dọc</span>
+                <input
+                  type="range"
+                  min="-70"
+                  max="70"
+                  step="1"
+                  value={crop.offsetY}
+                  onChange={(e) => setCrop((current) => ({ ...current, offsetY: Number(e.target.value) }))}
+                  disabled={!photoSource}
+                />
+              </label>
+              {photoSource && (
+                <button type="button" className="guest-clear-photo" onClick={clearGuestPhoto}>
+                  Xóa ảnh
+                </button>
+              )}
+            </div>
+          </div>
+          <label className="guest-form-field guest-message-field">
+            <span>Lời nhắn riêng</span>
+            <textarea
+              value={privateMessage}
+              onChange={(e) => setPrivateMessage(e.target.value)}
+              placeholder="Ví dụ: Cảm ơn bạn đã luôn đồng hành cùng mình trong những năm đại học."
+              rows={5}
+            />
+          </label>
+        </div>
         <button type="submit" disabled={creating || !name.trim()} className="guest-create-btn">
           <Link2 size={18} />
           {creating ? "Đang tạo..." : "Tạo link mời"}
@@ -1531,11 +1875,21 @@ function GuestManager({ authHeaders }) {
           const link = `${baseUrl}/?token=${guest.token}`;
           return (
             <div className="guest-item" key={guest.id}>
+              {guest.photoUrl ? (
+                <img className="guest-list-photo" src={resolveAsset(guest.photoUrl)} alt={guest.name} />
+              ) : (
+                <div className="guest-list-photo guest-list-photo-empty">
+                  <Users size={18} />
+                </div>
+              )}
               <div className="guest-info">
                 <div className="guest-name-row">
                   <span className="guest-badge">{guest.relation}</span>
                   <strong>{guest.name}</strong>
                 </div>
+                {guest.privateMessage && (
+                  <p className="guest-private-preview">{guest.privateMessage}</p>
+                )}
                 <a
                   className="guest-link"
                   href={link}
@@ -1574,6 +1928,150 @@ function GuestManager({ authHeaders }) {
 }
 
 // ── Shared components ─────────────────────────────────────────────────────────
+
+function VoiceRecorder({ currentUrl, onUploadFile, onSaveRecording, onDelete }) {
+  const [recState, setRecState] = useState("idle"); // idle | recording | preview | saving
+  const [recSeconds, setRecSeconds] = useState(0);
+  const [previewUrl, setPreviewUrl] = useState(null);
+  const [recError, setRecError] = useState("");
+  const mediaRecRef = useRef(null);
+  const chunksRef = useRef([]);
+  const timerRef = useRef(null);
+  const fileInputRef = useRef(null);
+
+  // Dọn preview blob URL khi unmount
+  useEffect(() => () => {
+    if (previewUrl) URL.revokeObjectURL(previewUrl);
+  }, [previewUrl]);
+
+  const startRecording = async () => {
+    setRecError("");
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      chunksRef.current = [];
+      const mr = new MediaRecorder(stream, { mimeType: "audio/webm" });
+      mr.ondataavailable = (e) => { if (e.data.size > 0) chunksRef.current.push(e.data); };
+      mr.onstop = () => {
+        stream.getTracks().forEach((t) => t.stop());
+        const blob = new Blob(chunksRef.current, { type: "audio/webm" });
+        const url = URL.createObjectURL(blob);
+        setPreviewUrl(url);
+        setRecState("preview");
+      };
+      mr.start();
+      mediaRecRef.current = mr;
+      setRecSeconds(0);
+      setRecState("recording");
+      timerRef.current = setInterval(() => setRecSeconds((s) => s + 1), 1000);
+    } catch {
+      setRecError("Không truy cập được micro. Vui lòng cấp quyền micro cho trình duyệt.");
+    }
+  };
+
+  const stopRecording = () => {
+    clearInterval(timerRef.current);
+    mediaRecRef.current?.stop();
+  };
+
+  const discardPreview = () => {
+    if (previewUrl) URL.revokeObjectURL(previewUrl);
+    setPreviewUrl(null);
+    setRecState("idle");
+    setRecSeconds(0);
+  };
+
+  const saveRecording = async () => {
+    if (!previewUrl) return;
+    setRecState("saving");
+    const blob = new Blob(chunksRef.current, { type: "audio/webm" });
+    await onSaveRecording(blob);
+    if (previewUrl) URL.revokeObjectURL(previewUrl);
+    setPreviewUrl(null);
+    setRecState("idle");
+    setRecSeconds(0);
+  };
+
+  const fmt = (s) => `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`;
+
+  return (
+    <div className="voice-recorder">
+      {/* --- Đã có âm thanh đã lưu --- */}
+      {currentUrl && (
+        <div className="vr-saved">
+          <div className="vr-saved-label"><Check size={14} /> Đã lưu âm thanh</div>
+          <audio className="vr-audio" controls src={currentUrl}>
+            Trình duyệt không hỗ trợ phát âm thanh.
+          </audio>
+          <button type="button" className="vr-btn vr-btn-danger" onClick={onDelete}>
+            <Trash2 size={15} /> Xóa
+          </button>
+        </div>
+      )}
+
+      {/* --- Chưa có hoặc muốn ghi mới --- */}
+      {recState === "idle" && (
+        <div className="vr-actions">
+          <button type="button" className="vr-btn vr-btn-record" onClick={startRecording}>
+            <Mic size={16} /> {currentUrl ? "Ghi âm mới" : "Bắt đầu ghi âm"}
+          </button>
+          <label className="vr-btn vr-btn-upload">
+            <Upload size={16} /> Tải file lên
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="audio/mpeg,audio/mp3,audio/mp4,audio/x-m4a,audio/wav,audio/ogg,audio/aac,audio/flac,audio/webm"
+              style={{ display: "none" }}
+              onChange={(e) => onUploadFile(e.target.files)}
+            />
+          </label>
+          {!currentUrl && (
+            <p className="vr-hint">Ghi âm trực tiếp hoặc tải lên file âm thanh để dùng làm lời mời mở thiệp.</p>
+          )}
+        </div>
+      )}
+
+      {/* --- Đang ghi --- */}
+      {recState === "recording" && (
+        <div className="vr-recording">
+          <span className="vr-rec-dot" aria-hidden="true" />
+          <span className="vr-timer">{fmt(recSeconds)}</span>
+          <span className="vr-rec-label">Đang ghi âm...</span>
+          <button type="button" className="vr-btn vr-btn-stop" onClick={stopRecording}>
+            <Square size={14} /> Dừng
+          </button>
+        </div>
+      )}
+
+      {/* --- Xem trước --- */}
+      {recState === "preview" && previewUrl && (
+        <div className="vr-preview">
+          <p className="vr-preview-label"><Play size={13} /> Nghe lại bản ghi âm</p>
+          <audio className="vr-audio" controls src={previewUrl}>
+            Trình duyệt không hỗ trợ phát âm thanh.
+          </audio>
+          <div className="vr-preview-actions">
+            <button type="button" className="vr-btn vr-btn-save" onClick={saveRecording}>
+              <Save size={15} /> Lưu lại
+            </button>
+            <button type="button" className="vr-btn vr-btn-discard" onClick={discardPreview}>
+              <Trash2 size={15} /> Bỏ &amp; ghi lại
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* --- Đang lưu --- */}
+      {recState === "saving" && (
+        <div className="vr-saving">
+          <span className="vr-spinner" aria-hidden="true" />
+          Đang lưu bản ghi âm...
+        </div>
+      )}
+
+      {recError && <p className="vr-error">{recError}</p>}
+    </div>
+  );
+}
 
 function PanelTitle({ icon, title }) {
   return (
@@ -1651,6 +2149,8 @@ function App() {
   const [isOpened, setIsOpened] = useState(false);
   const audioRef = useRef(null);
 
+  const [isMuted, setIsMuted] = useState(false);
+
   const playMusic = useCallback(() => {
     const audio = audioRef.current;
     if (!audio || !config.musicUrl) return;
@@ -1661,9 +2161,11 @@ function App() {
 
   const handleInvitationOpen = useCallback(() => {
     setIsOpened(true);
+    // Nhạc chỉ bắt đầu khi mở thiệp
     playMusic();
   }, [playMusic]);
 
+  // Reset audio khi đổi bài nhạc
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio) return;
@@ -1671,36 +2173,13 @@ function App() {
     audio.load();
   }, [config.musicUrl]);
 
-  useEffect(() => {
-    if (!config.musicUrl || isAdmin) return undefined;
-
+  const toggleMute = useCallback(() => {
     const audio = audioRef.current;
-    const timers = [0, 250, 900, 1800].map((delay) => window.setTimeout(playMusic, delay));
-
-    const playAfterInteraction = () => {
-      playMusic();
-      window.removeEventListener("pointerdown", playAfterInteraction);
-      window.removeEventListener("keydown", playAfterInteraction);
-      window.removeEventListener("touchstart", playAfterInteraction);
-    };
-
-    window.addEventListener("pointerdown", playAfterInteraction, { once: true });
-    window.addEventListener("keydown", playAfterInteraction, { once: true });
-    window.addEventListener("touchstart", playAfterInteraction, { once: true });
-    document.addEventListener("visibilitychange", playMusic);
-    audio?.addEventListener("canplay", playMusic);
-    audio?.addEventListener("loadeddata", playMusic);
-
-    return () => {
-      timers.forEach((timer) => window.clearTimeout(timer));
-      window.removeEventListener("pointerdown", playAfterInteraction);
-      window.removeEventListener("keydown", playAfterInteraction);
-      window.removeEventListener("touchstart", playAfterInteraction);
-      document.removeEventListener("visibilitychange", playMusic);
-      audio?.removeEventListener("canplay", playMusic);
-      audio?.removeEventListener("loadeddata", playMusic);
-    };
-  }, [config.musicUrl, isAdmin, playMusic]);
+    if (!audio) return;
+    const next = !isMuted;
+    setIsMuted(next);
+    audio.muted = next;
+  }, [isMuted]);
 
   const page = useMemo(() => {
     if (loading || !guestChecked) return <div className="loading">Đang tải...</div>;
@@ -1714,8 +2193,16 @@ function App() {
         />
       );
     }
-    return <Invitation config={config} isOpened={isOpened} />;
-  }, [config, isAdmin, loading, setConfig, isOpened, guest, guestChecked, handleInvitationOpen]);
+    return (
+      <Invitation
+        config={config}
+        isOpened={isOpened}
+        isMuted={isMuted}
+        onToggleMute={toggleMute}
+        hasMusic={!!config.musicUrl}
+      />
+    );
+  }, [config, isAdmin, loading, setConfig, isOpened, guest, guestChecked, handleInvitationOpen, isMuted, toggleMute]);
 
   return (
     <>
@@ -1724,11 +2211,8 @@ function App() {
           ref={audioRef}
           src={resolveAsset(config.musicUrl)}
           preload="auto"
-          autoPlay
           playsInline
           loop
-          onCanPlay={playMusic}
-          onLoadedData={playMusic}
         />
       )}
       {page}

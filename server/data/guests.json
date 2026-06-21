@@ -5,5 +5,14 @@
     "relation": "Bạn",
     "token": "a794c7b0261a8d646e110f34",
     "createdAt": "2026-06-19T01:47:44.740Z"
+  },
+  {
+    "id": "1782040672893-217655",
+    "name": "Phan Thị Mai",
+    "relation": "Bạn",
+    "photoUrl": "/uploads/1782040672877-75764106.jpg",
+    "privateMessage": "Cảm ơn bạn",
+    "token": "df3711039ee0957bee20fb35",
+    "createdAt": "2026-06-21T11:17:52.893Z"
   }
 ]
