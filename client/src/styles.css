@@ -4532,7 +4532,7 @@ a {
 /* Override toàn bộ animation và định vị cũ của GIF */
 .env-messenger-gif {
   position: fixed !important;
-  left: 0 !important;
+  left: 0;
   top: auto !important;
   bottom: 24px !important; /* Đưa xuống vùng khoanh tròn sát đáy */
   z-index: 15 !important;
@@ -4586,4 +4586,400 @@ a {
 /* Giữ env-bg-icons nhỏ và tinh tế hơn */
 .env-bg-icon {
   opacity: 0.06 !important;
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   FINAL MOTION FIX — visible falling caps + loaded GIF run-in
+   ══════════════════════════════════════════════════════════════════════════ */
+
+.env-bg-icons {
+  position: absolute !important;
+  inset: -130px 0 0 !important;
+  z-index: 2 !important;
+  overflow: hidden !important;
+  pointer-events: none !important;
+}
+
+.env-bg-icon {
+  top: -72px !important;
+  opacity: 1 !important;
+  color: rgb(77 55 78 / 46%) !important;
+  filter:
+    drop-shadow(0 4px 7px rgb(255 255 255 / 72%))
+    drop-shadow(0 8px 12px rgb(126 78 111 / 18%)) !important;
+  animation-name: capRainVisibleFinal !important;
+  animation-timing-function: linear !important;
+  animation-iteration-count: infinite !important;
+}
+
+.env-bg-icon svg {
+  width: 24px !important;
+  height: 24px !important;
+  fill: rgb(255 255 255 / 24%) !important;
+  stroke-width: 2.35 !important;
+}
+
+.env-bg-icon-1  { left: 4% !important;  animation-delay: -0.4s !important; animation-duration: 7.2s !important; }
+.env-bg-icon-2  { left: 11% !important; animation-delay: -3.1s !important; animation-duration: 8.8s !important; }
+.env-bg-icon-3  { left: 18% !important; animation-delay: -5.4s !important; animation-duration: 7.8s !important; }
+.env-bg-icon-4  { left: 25% !important; animation-delay: -1.9s !important; animation-duration: 9.4s !important; }
+.env-bg-icon-5  { left: 32% !important; animation-delay: -6.2s !important; animation-duration: 8.1s !important; }
+.env-bg-icon-6  { left: 39% !important; animation-delay: -2.7s !important; animation-duration: 9.8s !important; }
+.env-bg-icon-7  { left: 47% !important; animation-delay: -7.6s !important; animation-duration: 7.5s !important; }
+.env-bg-icon-8  { left: 55% !important; animation-delay: -4.3s !important; animation-duration: 8.9s !important; }
+.env-bg-icon-9  { left: 63% !important; animation-delay: -0.9s !important; animation-duration: 7.9s !important; }
+.env-bg-icon-10 { left: 71% !important; animation-delay: -5.8s !important; animation-duration: 9.2s !important; }
+.env-bg-icon-11 { left: 79% !important; animation-delay: -2.2s !important; animation-duration: 8.4s !important; }
+.env-bg-icon-12 { left: 87% !important; animation-delay: -6.9s !important; animation-duration: 10s !important; }
+.env-bg-icon-13 { left: 95% !important; animation-delay: -3.6s !important; animation-duration: 8.3s !important; }
+.env-bg-icon-14 { left: 14% !important; animation-delay: -7.4s !important; animation-duration: 9.7s !important; }
+.env-bg-icon-15 { left: 29% !important; animation-delay: -8.2s !important; animation-duration: 8.6s !important; }
+.env-bg-icon-16 { left: 44% !important; animation-delay: -5.1s !important; animation-duration: 9.6s !important; }
+.env-bg-icon-17 { left: 59% !important; animation-delay: -1.4s !important; animation-duration: 7.7s !important; }
+.env-bg-icon-18 { left: 74% !important; animation-delay: -8.8s !important; animation-duration: 10.2s !important; }
+.env-bg-icon-19 { left: 89% !important; animation-delay: -4.9s !important; animation-duration: 8.7s !important; }
+.env-bg-icon-20 { left: 7% !important;  animation-delay: -9.1s !important; animation-duration: 9.5s !important; }
+.env-bg-icon-21 { left: 22% !important; animation-delay: -6.4s !important; animation-duration: 8s !important; }
+.env-bg-icon-22 { left: 52% !important; animation-delay: -9.7s !important; animation-duration: 10.4s !important; }
+.env-bg-icon-23 { left: 68% !important; animation-delay: -3.9s !important; animation-duration: 8.2s !important; }
+.env-bg-icon-24 { left: 83% !important; animation-delay: -7.1s !important; animation-duration: 9.1s !important; }
+
+@keyframes capRainVisibleFinal {
+  0% {
+    opacity: 0;
+    transform: translate3d(-14px, -95px, 0) rotate(-22deg) scale(0.78);
+  }
+
+  10% {
+    opacity: 0.86;
+  }
+
+  32% {
+    transform: translate3d(22px, 32vh, 0) rotate(16deg) scale(1.03);
+  }
+
+  64% {
+    transform: translate3d(-18px, 68vh, 0) rotate(52deg) scale(0.94);
+  }
+
+  90% {
+    opacity: 0.62;
+  }
+
+  100% {
+    opacity: 0;
+    transform: translate3d(18px, 118vh, 0) rotate(92deg) scale(0.86);
+  }
+}
+
+.env-messenger-gif {
+  --gif-stop-left: max(18px, calc(100vw - 288px));
+  position: fixed !important;
+  left: -130px;
+  right: auto !important;
+  top: auto !important;
+  bottom: 24px !important;
+  z-index: 30 !important;
+  width: clamp(104px, 18vw, 142px) !important;
+  height: clamp(104px, 18vw, 142px) !important;
+  object-fit: contain !important;
+  opacity: 0;
+  transform: none;
+  animation: none;
+  transition: none !important;
+  will-change: left, opacity, transform !important;
+}
+
+.env-messenger-gif.env-messenger-ready {
+  animation: messengerRunByLeftFinal 2.55s cubic-bezier(0.18, 0.92, 0.24, 1) both !important;
+}
+
+.env-messenger-gif.env-messenger-leaving {
+  animation: messengerLeaveByLeftFinal 420ms ease both !important;
+}
+
+@keyframes messengerRunByLeftFinal {
+  0% {
+    left: -130px;
+    opacity: 0;
+    transform: translateY(18px) scale(0.84) rotate(-8deg);
+  }
+
+  10% {
+    opacity: 1;
+  }
+
+  72% {
+    left: calc(var(--gif-stop-left) + 12px);
+    opacity: 1;
+    transform: translateY(-6px) scale(1.06) rotate(3deg);
+  }
+
+  100% {
+    left: var(--gif-stop-left);
+    opacity: 1;
+    transform: translateY(0) scale(1) rotate(0);
+  }
+}
+
+@keyframes messengerLeaveByLeftFinal {
+  from {
+    left: var(--gif-stop-left);
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+
+  to {
+    left: calc(var(--gif-stop-left) - 18px);
+    opacity: 0;
+    transform: translateY(18px) scale(0.82);
+  }
+}
+
+@media (max-width: 520px) {
+  .env-messenger-gif {
+    --gif-stop-left: calc(100vw - 274px);
+    bottom: 18px !important;
+    width: 92px !important;
+    height: 92px !important;
+  }
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   FINAL CENTER PREVIEW — two tilted photo cards like reference
+   ══════════════════════════════════════════════════════════════════════════ */
+
+.friend-stage,
+.friend-names {
+  display: none !important;
+}
+
+.invite-preview-stack {
+  position: relative !important;
+  display: block !important;
+  width: min(100%, 405px) !important;
+  min-height: 342px !important;
+  margin: 42px auto 0 !important;
+  z-index: 6 !important;
+}
+
+.invite-mini-card {
+  position: absolute !important;
+  width: 188px !important;
+  height: 268px !important;
+  padding: 10px !important;
+  border: 5px solid #fff8df !important;
+  border-radius: 12px !important;
+  background:
+    linear-gradient(180deg, #fffef5 0%, #fffaf0 100%) !important;
+  box-shadow:
+    0 15px 23px rgb(74 48 62 / 22%),
+    0 3px 7px rgb(74 48 62 / 12%),
+    inset 0 0 0 2px #d6c395 !important;
+  overflow: hidden !important;
+  transform-origin: 50% 70% !important;
+}
+
+.invite-mini-card::before {
+  content: "";
+  position: absolute;
+  inset: 8px;
+  z-index: 2;
+  pointer-events: none;
+  border: 2px solid #d6c395;
+  border-radius: 7px;
+}
+
+.invite-mini-card--bouquet {
+  left: 16px !important;
+  top: 3px !important;
+  transform: rotate(-7deg) !important;
+  animation: refLeftCardIn 820ms cubic-bezier(0.22, 1, 0.36, 1) 120ms both,
+    refLeftCardFloat 4.8s ease-in-out 1s infinite alternate !important;
+}
+
+.invite-mini-card--photo {
+  right: 5px !important;
+  top: 36px !important;
+  transform: rotate(8deg) !important;
+  animation: refRightCardIn 820ms cubic-bezier(0.22, 1, 0.36, 1) 240ms both,
+    refRightCardFloat 5.1s ease-in-out 1.1s infinite alternate !important;
+}
+
+.invite-mini-card--photo img,
+.invite-photo-placeholder {
+  position: relative;
+  z-index: 1;
+  width: 100% !important;
+  height: 100% !important;
+  border-radius: 7px !important;
+}
+
+.invite-mini-card--photo img {
+  object-fit: cover !important;
+}
+
+.invite-photo-placeholder {
+  display: grid !important;
+  place-items: center !important;
+  color: #9a8063 !important;
+  background: #f5eadf !important;
+}
+
+.bouquet-illustration {
+  position: relative !important;
+  z-index: 1 !important;
+  width: 100% !important;
+  height: 100% !important;
+  display: grid !important;
+  place-items: center !important;
+  color: #151515 !important;
+  background:
+    radial-gradient(circle at 50% 54%, rgb(255 235 185 / 55%), transparent 30%),
+    #fffef7 !important;
+}
+
+.bouquet-illustration > svg {
+  position: absolute !important;
+  top: 72px !important;
+  left: 50% !important;
+  z-index: 6 !important;
+  transform: translateX(-50%) rotate(-3deg) !important;
+  fill: #111 !important;
+  filter: drop-shadow(0 4px 4px rgb(0 0 0 / 22%)) !important;
+}
+
+.flower,
+.leaf {
+  position: absolute !important;
+  display: block !important;
+}
+
+.flower {
+  z-index: 4 !important;
+  width: 38px !important;
+  height: 38px !important;
+  border-radius: 50% !important;
+  background:
+    radial-gradient(circle at 50% 50%, #ffe07f 0 17%, transparent 18%),
+    conic-gradient(#e05d34, #f2b533, #d7482f, #f5c94b, #356796, #e05d34) !important;
+  box-shadow:
+    inset 0 0 0 5px rgb(255 255 255 / 18%),
+    0 4px 6px rgb(95 58 32 / 18%) !important;
+}
+
+.flower-1 { left: 46px !important; top: 130px !important; }
+.flower-2 { left: 74px !important; top: 116px !important; background:
+  radial-gradient(circle at 50% 50%, #ffe394 0 17%, transparent 18%),
+  conic-gradient(#f0a928, #f7cd4d, #d77a24, #f3b231, #f0a928) !important; }
+.flower-3 { left: 102px !important; top: 137px !important; background:
+  radial-gradient(circle at 50% 50%, #ffd7a1 0 17%, transparent 18%),
+  conic-gradient(#284a76, #e6b647, #bd3f36, #315c7c, #284a76) !important; }
+.flower-4 { left: 64px !important; top: 154px !important; width: 34px !important; height: 34px !important; }
+.flower-5 { left: 92px !important; top: 158px !important; width: 32px !important; height: 32px !important; background:
+  radial-gradient(circle at 50% 50%, #fff0ab 0 17%, transparent 18%),
+  conic-gradient(#e6b72e, #f7ca46, #dd702d, #edb42c, #e6b72e) !important; }
+
+.leaf {
+  z-index: 3 !important;
+  width: 60px !important;
+  height: 18px !important;
+  border-radius: 100% 0 !important;
+  background: #617f3e !important;
+}
+
+.leaf-1 { left: 31px !important; top: 155px !important; transform: rotate(35deg) !important; }
+.leaf-2 { right: 31px !important; top: 160px !important; transform: rotate(138deg) !important; }
+.leaf-3 { left: 70px !important; top: 181px !important; width: 82px !important; height: 18px !important; transform: rotate(88deg) !important; background: #85532b !important; }
+
+@keyframes refLeftCardIn {
+  from {
+    opacity: 0;
+    transform: translate3d(-46px, 30px, 0) rotate(-15deg) scale(0.86);
+  }
+
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) rotate(-7deg) scale(1);
+  }
+}
+
+@keyframes refRightCardIn {
+  from {
+    opacity: 0;
+    transform: translate3d(46px, 30px, 0) rotate(16deg) scale(0.86);
+  }
+
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) rotate(8deg) scale(1);
+  }
+}
+
+@keyframes refLeftCardFloat {
+  from { transform: translate3d(0, 0, 0) rotate(-7deg) scale(1); }
+  to { transform: translate3d(-4px, -8px, 0) rotate(-8.5deg) scale(1.015); }
+}
+
+@keyframes refRightCardFloat {
+  from { transform: translate3d(0, 0, 0) rotate(8deg) scale(1); }
+  to { transform: translate3d(5px, -7px, 0) rotate(9.5deg) scale(1.015); }
+}
+
+.env-messenger-gif {
+  --gif-stop-left: max(14px, calc(50vw - 240px)) !important;
+  display: block !important;
+  visibility: visible !important;
+  z-index: 90 !important;
+  bottom: 18px !important;
+  width: 118px !important;
+  height: 142px !important;
+  mix-blend-mode: multiply !important;
+}
+
+@media (max-width: 520px) {
+  .invite-preview-stack {
+    width: min(100%, 350px) !important;
+    min-height: 304px !important;
+    margin-top: 34px !important;
+  }
+
+  .invite-mini-card {
+    width: 158px !important;
+    height: 226px !important;
+    padding: 8px !important;
+  }
+
+  .invite-mini-card--bouquet {
+    left: 12px !important;
+  }
+
+  .invite-mini-card--photo {
+    right: 2px !important;
+    top: 28px !important;
+  }
+
+  .bouquet-illustration > svg {
+    top: 58px !important;
+  }
+
+  .flower {
+    width: 31px !important;
+    height: 31px !important;
+  }
+
+  .flower-1 { left: 38px !important; top: 108px !important; }
+  .flower-2 { left: 62px !important; top: 98px !important; }
+  .flower-3 { left: 86px !important; top: 114px !important; }
+  .flower-4 { left: 54px !important; top: 130px !important; width: 28px !important; height: 28px !important; }
+  .flower-5 { left: 78px !important; top: 134px !important; width: 27px !important; height: 27px !important; }
+  .leaf-1 { left: 25px !important; top: 130px !important; }
+  .leaf-2 { right: 25px !important; top: 134px !important; }
+  .leaf-3 { left: 57px !important; top: 151px !important; }
+
+  .env-messenger-gif {
+    --gif-stop-left: 14px !important;
+    width: 84px !important;
+    height: 108px !important;
+  }
 }

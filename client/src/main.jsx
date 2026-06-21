@@ -668,6 +668,7 @@ function FlipDigit({ value }) {
 function EnvelopeScreen({ config, guest, onOpen }) {
   const [opening, setOpening] = useState(false);
   const [confetti, setConfetti] = useState(false);
+  const [messengerReady, setMessengerReady] = useState(false);
   const envelopeRef = useRef(null);
   const promptAudioRef = useRef(null);
   const greetingText = useMemo(
@@ -677,10 +678,11 @@ function EnvelopeScreen({ config, guest, onOpen }) {
   const { displayed, done: greetingDone } = useTypewriter(greetingText);
   const featuredImage = useMemo(() => {
     const merged = [...(config.heroImages || []), config.heroImage].filter(Boolean);
-    return merged[0] || config.introGreetingImage || "";
-  }, [config.heroImage, config.heroImages, config.introGreetingImage]);
+    return merged[0] || config.hostPortraitImage || "";
+  }, [config.heroImage, config.heroImages, config.hostPortraitImage]);
   const hostPortrait = config.hostPortraitImage || featuredImage;
   const guestPortrait = guest?.photoUrl || "";
+  const previewPhoto = hostPortrait || guestPortrait || featuredImage;
 
   // Sparkle positions (stable, generated once)
   const sparkles = useMemo(() =>
@@ -706,7 +708,7 @@ function EnvelopeScreen({ config, guest, onOpen }) {
   useEffect(() => {
     if (!greetingDone || !config.openPromptAudioUrl || opening) return undefined;
     // Delay = GIF animation duration so audio plays right as GIF arrives
-    const delay = config.introGreetingImage ? 5200 : 600;
+    const delay = config.introGreetingImage ? 2600 : 600;
     const timer = window.setTimeout(() => {
       const audio = promptAudioRef.current;
       if (!audio) return;
@@ -750,10 +752,11 @@ function EnvelopeScreen({ config, guest, onOpen }) {
       {/* GIF nhân vật chạy vào từ bên trái */}
       {config.introGreetingImage && greetingDone && (
         <img
-          className={`env-messenger-gif${opening ? " env-messenger-leaving" : ""}`}
+          className={`env-messenger-gif${messengerReady ? " env-messenger-ready" : ""}${opening ? " env-messenger-leaving" : ""}`}
           src={resolveAsset(config.introGreetingImage)}
           alt=""
           aria-hidden="true"
+          onLoad={() => setMessengerReady(true)}
         />
       )}
 
@@ -774,35 +777,30 @@ function EnvelopeScreen({ config, guest, onOpen }) {
           </p>
         </div>
 
-        {/* 3. Bạn bè — casual style */}
-        <div className="friend-stage">
-          {/* Avatar chủ */}
-          <div className="friend-avatar friend-avatar--host">
-            {hostPortrait
-              ? <img src={resolveAsset(hostPortrait)} alt="" />
-              : <GraduationCap size={32} />}
-            <span className="friend-badge-role">📤 Gửi</span>
+        <div className="invite-preview-stack" aria-hidden="true">
+          <div className="invite-mini-card invite-mini-card--bouquet">
+            <div className="bouquet-illustration">
+              <GraduationCap size={62} strokeWidth={2.35} />
+              <span className="flower flower-1" />
+              <span className="flower flower-2" />
+              <span className="flower flower-3" />
+              <span className="flower flower-4" />
+              <span className="flower flower-5" />
+              <span className="leaf leaf-1" />
+              <span className="leaf leaf-2" />
+              <span className="leaf leaf-3" />
+            </div>
           </div>
 
-          {/* Kết nối */}
-          <div className="friend-connector">
-            <span className="friend-connector-icon">🎉</span>
+          <div className="invite-mini-card invite-mini-card--photo">
+            {previewPhoto ? (
+              <img src={resolveAsset(previewPhoto)} alt="" />
+            ) : (
+              <div className="invite-photo-placeholder">
+                <Camera size={44} />
+              </div>
+            )}
           </div>
-
-          {/* Avatar khách */}
-          <div className="friend-avatar friend-avatar--guest">
-            {guestPortrait
-              ? <img src={resolveAsset(guestPortrait)} alt="" />
-              : <Users size={28} />}
-            <span className="friend-badge-role">📬 Nhận</span>
-          </div>
-        </div>
-
-        {/* Tên hai người */}
-        <div className="friend-names">
-          <span className="friend-name">{config.hostName || config.graduateName || "Bạn"}</span>
-          <span className="friend-sep">→</span>
-          <span className="friend-name">{guest?.name || "Bạn thân"}</span>
         </div>
 
         {/* Gợi ý chạm đã được xóa theo yêu cầu */}
@@ -908,7 +906,7 @@ function Invitation({ config, isOpened, isMuted, onToggleMute, hasMusic }) {
         <PhotoCarousel photos={photos} graduateName={config.graduateName} />
         <div className="hero-copy">
           <p className="eyebrow">Thư mời dự tốt nghiệp</p>
-          <h1>{config.graduateName}</h1>
+          <h2>{config.graduateName}</h2>
           <p>{config.degree}</p>
           <span>{config.school}</span>
         </div>
