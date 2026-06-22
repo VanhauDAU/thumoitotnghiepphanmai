@@ -421,91 +421,147 @@ function playDefaultOpeningSound() {
   const AudioContext = window.AudioContext || window.webkitAudioContext;
   if (!AudioContext) return;
 
-  const context = new AudioContext();
-  const now = context.currentTime;
-  const master = context.createGain();
-  master.gain.setValueAtTime(0.001, now);
-  master.gain.exponentialRampToValueAtTime(0.42, now + 0.02);
-  master.gain.exponentialRampToValueAtTime(0.001, now + 1.65);
-  master.connect(context.destination);
+  const ctx = new AudioContext();
+  const t = ctx.currentTime;
 
-  const playTone = ({ frequency, start, duration, peak = 0.28, type = "sine", detune = 0, sweep = 1.01 }) => {
-    const oscillator = context.createOscillator();
-    const gain = context.createGain();
+  // ── Reverb / Delay tail ───────────────────────────────────────────────────
+  // Two feedback delay nodes give a lush "room" feel without a real convolver
+  const delay1 = ctx.createDelay(0.5);
+  const delay2 = ctx.createDelay(0.34);
+  const delayFb1 = ctx.createGain();
+  const delayFb2 = ctx.createGain();
+  const delayOut = ctx.createGain();
+  delay1.delayTime.value = 0.22;
+  delay2.delayTime.value = 0.17;
+  delayFb1.gain.value = 0.36;
+  delayFb2.gain.value = 0.28;
+  delayOut.gain.value = 0.38;
+  delay1.connect(delayFb1); delayFb1.connect(delay1);
+  delay2.connect(delayFb2); delayFb2.connect(delay2);
+  delay1.connect(delayOut); delay2.connect(delayOut);
+  delayOut.connect(ctx.destination);
 
-    oscillator.type = type;
-    oscillator.frequency.setValueAtTime(frequency, start);
-    oscillator.detune.setValueAtTime(detune, start);
-    oscillator.frequency.exponentialRampToValueAtTime(frequency * sweep, start + duration * 0.76);
-    gain.gain.setValueAtTime(0.001, start);
-    gain.gain.exponentialRampToValueAtTime(peak, start + 0.014);
-    gain.gain.exponentialRampToValueAtTime(0.001, start + duration);
+  // Master bus
+  const master = ctx.createGain();
+  master.gain.setValueAtTime(0.001, t);
+  master.gain.exponentialRampToValueAtTime(0.55, t + 0.025);
+  master.gain.setValueAtTime(0.55, t + 1.6);
+  master.gain.exponentialRampToValueAtTime(0.001, t + 2.4);
+  master.connect(ctx.destination);
+  master.connect(delay1);
+  master.connect(delay2);
 
-    oscillator.connect(gain);
-    gain.connect(master);
-    oscillator.start(start);
-    oscillator.stop(start + duration + 0.04);
+  // ── Utility: single oscillator tone ──────────────────────────────────────
+  const tone = ({ freq, start, dur, peak = 0.22, type = "sine", detune = 0, freqEnd }) => {
+    const osc = ctx.createOscillator();
+    const g = ctx.createGain();
+    osc.type = type;
+    osc.frequency.setValueAtTime(freq, start);
+    osc.detune.setValueAtTime(detune, start);
+    if (freqEnd) osc.frequency.exponentialRampToValueAtTime(freqEnd, start + dur * 0.8);
+    // Snappy attack, gentle decay
+    g.gain.setValueAtTime(0.0001, start);
+    g.gain.exponentialRampToValueAtTime(peak, start + 0.012);
+    g.gain.exponentialRampToValueAtTime(peak * 0.6, start + dur * 0.25);
+    g.gain.exponentialRampToValueAtTime(0.0001, start + dur);
+    osc.connect(g); g.connect(master);
+    osc.start(start); osc.stop(start + dur + 0.05);
   };
 
-  const noiseBuffer = context.createBuffer(1, context.sampleRate * 0.44, context.sampleRate);
-  const noiseData = noiseBuffer.getChannelData(0);
-  for (let i = 0; i < noiseData.length; i += 1) {
-    const progress = i / noiseData.length;
-    noiseData[i] = (Math.random() * 2 - 1) * Math.sin(progress * Math.PI) * (1 - progress * 0.35);
-  }
-  const whoosh = context.createBufferSource();
-  const whooshGain = context.createGain();
-  const whooshFilter = context.createBiquadFilter();
-  whoosh.buffer = noiseBuffer;
-  whooshFilter.type = "bandpass";
-  whooshFilter.frequency.setValueAtTime(620, now);
-  whooshFilter.frequency.exponentialRampToValueAtTime(3600, now + 0.34);
-  whooshFilter.Q.setValueAtTime(0.75, now);
-  whooshGain.gain.setValueAtTime(0.001, now);
-  whooshGain.gain.exponentialRampToValueAtTime(0.18, now + 0.035);
-  whooshGain.gain.exponentialRampToValueAtTime(0.001, now + 0.42);
-  whoosh.connect(whooshFilter);
-  whooshFilter.connect(whooshGain);
-  whooshGain.connect(master);
-  whoosh.start(now);
-  whoosh.stop(now + 0.44);
+  // ── Utility: noise burst ─────────────────────────────────────────────────
+  const noiseBurst = ({ start, dur, peakGain, filterType, filterFreqStart, filterFreqEnd, Q = 1 }) => {
+    const bufLen = Math.ceil(ctx.sampleRate * (dur + 0.05));
+    const buf = ctx.createBuffer(1, bufLen, ctx.sampleRate);
+    const data = buf.getChannelData(0);
+    for (let i = 0; i < data.length; i++) {
+      const env = Math.sin((i / data.length) * Math.PI);
+      data[i] = (Math.random() * 2 - 1) * env;
+    }
+    const src = ctx.createBufferSource();
+    const filt = ctx.createBiquadFilter();
+    const g = ctx.createGain();
+    src.buffer = buf;
+    filt.type = filterType;
+    filt.frequency.setValueAtTime(filterFreqStart, start);
+    if (filterFreqEnd) filt.frequency.exponentialRampToValueAtTime(filterFreqEnd, start + dur * 0.7);
+    filt.Q.setValueAtTime(Q, start);
+    g.gain.setValueAtTime(0.0001, start);
+    g.gain.exponentialRampToValueAtTime(peakGain, start + 0.018);
+    g.gain.exponentialRampToValueAtTime(0.0001, start + dur);
+    src.connect(filt); filt.connect(g); g.connect(master);
+    src.start(start); src.stop(start + dur + 0.06);
+  };
 
-  [
-    { frequency: 587.33, start: now + 0.08, duration: 0.38, peak: 0.3, type: "triangle", sweep: 1.035 },
-    { frequency: 880, start: now + 0.12, duration: 0.58, peak: 0.34, type: "sine", sweep: 1.02 },
-    { frequency: 1174.66, start: now + 0.18, duration: 0.74, peak: 0.28, type: "sine", sweep: 1.015 },
-    { frequency: 1760, start: now + 0.28, duration: 0.84, peak: 0.17, type: "sine", sweep: 1.01 },
-    { frequency: 2349.32, start: now + 0.38, duration: 0.68, peak: 0.11, type: "triangle", detune: 5, sweep: 1.008 }
-  ].forEach(playTone);
+  // ════════════════════════════════════════════════════════════════════════════
+  // 1. PAPER CRINKLE — delicate rustling as the envelope is touched (0s–0.18s)
+  // ════════════════════════════════════════════════════════════════════════════
+  noiseBurst({ start: t, dur: 0.16, peakGain: 0.12, filterType: "bandpass", filterFreqStart: 1200, filterFreqEnd: 4800, Q: 0.6 });
+  noiseBurst({ start: t + 0.07, dur: 0.12, peakGain: 0.08, filterType: "bandpass", filterFreqStart: 2200, filterFreqEnd: 6000, Q: 0.5 });
 
-  const shimmer = context.createBufferSource();
-  const shimmerGain = context.createGain();
-  const shimmerFilter = context.createBiquadFilter();
-  shimmer.buffer = noiseBuffer;
-  shimmerFilter.type = "highpass";
-  shimmerFilter.frequency.setValueAtTime(5200, now);
-  shimmerGain.gain.setValueAtTime(0.001, now + 0.18);
-  shimmerGain.gain.exponentialRampToValueAtTime(0.08, now + 0.22);
-  shimmerGain.gain.exponentialRampToValueAtTime(0.001, now + 0.62);
-  shimmer.connect(shimmerFilter);
-  shimmerFilter.connect(shimmerGain);
-  shimmerGain.connect(master);
-  shimmer.start(now + 0.16);
-  shimmer.stop(now + 0.66);
+  // ════════════════════════════════════════════════════════════════════════════
+  // 2. WAX SEAL POP — satisfying low thud when the seal breaks (0.10s)
+  // ════════════════════════════════════════════════════════════════════════════
+  // Sub-bass thud
+  tone({ freq: 120, start: t + 0.10, dur: 0.22, peak: 0.45, type: "sine", freqEnd: 45 });
+  // Mid crack body
+  tone({ freq: 280, start: t + 0.10, dur: 0.14, peak: 0.30, type: "triangle", freqEnd: 90 });
+  // Crack transient noise
+  noiseBurst({ start: t + 0.09, dur: 0.08, peakGain: 0.28, filterType: "highpass", filterFreqStart: 3000, Q: 0.4 });
 
-  [2637.02, 3135.96, 3951.07].forEach((frequency, index) => {
-    playTone({
-      frequency,
-      start: now + 0.54 + index * 0.075,
-      duration: 0.48,
-      peak: 0.09,
-      type: "sine",
-      sweep: 1.006
-    });
+  // ════════════════════════════════════════════════════════════════════════════
+  // 3. HARP GLISSANDO — 8 notes sweep up like a harp (0.18s–0.72s)
+  //    D-major scale: D4 F#4 A4 D5 F#5 A5 D6 F#6
+  // ════════════════════════════════════════════════════════════════════════════
+  const harpNotes = [293.66, 369.99, 440.00, 587.33, 739.99, 880.00, 1174.66, 1479.98];
+  harpNotes.forEach((freq, i) => {
+    const start = t + 0.18 + i * 0.068;
+    // Main harp pluck (triangle wave — warm & bright)
+    tone({ freq, start, dur: 0.9 - i * 0.04, peak: 0.26 - i * 0.015, type: "triangle" });
+    // Harmonic shimmer on top (sine, +octave, quieter)
+    tone({ freq: freq * 2, start: start + 0.006, dur: 0.55 - i * 0.03, peak: 0.07, type: "sine" });
   });
 
-  window.setTimeout(() => context.close().catch(() => {}), 2000);
+  // ════════════════════════════════════════════════════════════════════════════
+  // 4. CRYSTAL BELL MELODY — 5 bright bell tones, pentatonic feel (0.55s–1.3s)
+  //    Uses sine + 5th harmonic for that glassy bell timbre
+  // ════════════════════════════════════════════════════════════════════════════
+  const bellNotes = [
+    { freq: 1174.66, start: t + 0.55, dur: 1.0, peak: 0.18 },
+    { freq: 1396.91, start: t + 0.70, dur: 0.95, peak: 0.20 },
+    { freq: 1567.98, start: t + 0.84, dur: 0.90, peak: 0.22 },
+    { freq: 1760.00, start: t + 0.98, dur: 0.85, peak: 0.19 },
+    { freq: 2093.00, start: t + 1.10, dur: 0.80, peak: 0.14 },
+  ];
+  bellNotes.forEach(({ freq, start, dur, peak }) => {
+    // Fundamental
+    tone({ freq, start, dur, peak, type: "sine" });
+    // 5th partial — gives metallic bell character
+    tone({ freq: freq * 2.756, start: start + 0.003, dur: dur * 0.4, peak: peak * 0.22, type: "sine" });
+    // Sub octave warmth
+    tone({ freq: freq * 0.5, start, dur: dur * 0.6, peak: peak * 0.12, type: "sine" });
+  });
+
+  // ════════════════════════════════════════════════════════════════════════════
+  // 5. FAIRY DUST SHIMMER — high-freq sparkle at the peak (0.80s–1.40s)
+  // ════════════════════════════════════════════════════════════════════════════
+  noiseBurst({ start: t + 0.80, dur: 0.60, peakGain: 0.06, filterType: "highpass", filterFreqStart: 7000, Q: 0.3 });
+  // Tiny glitter pops
+  [0.82, 0.90, 0.98, 1.06, 1.14, 1.22].forEach((offset, i) => {
+    tone({ freq: 3000 + i * 420, start: t + offset, dur: 0.18, peak: 0.05, type: "sine", detune: (i % 2 === 0 ? 4 : -4) });
+  });
+
+  // ════════════════════════════════════════════════════════════════════════════
+  // 6. WARM CHORD BLOOM — full major chord swells in at the end (1.2s–2.2s)
+  //    D major: D4 F#4 A4 D5
+  // ════════════════════════════════════════════════════════════════════════════
+  [293.66, 369.99, 440.00, 587.33].forEach((freq, i) => {
+    const start = t + 1.22 + i * 0.04;
+    tone({ freq, start, dur: 1.0, peak: 0.09, type: "sine", detune: i * 2 });
+  });
+
+  window.setTimeout(() => ctx.close().catch(() => {}), 3200);
 }
+
 
 // ── Envelope Screen ───────────────────────────────────────────────────────────
 
