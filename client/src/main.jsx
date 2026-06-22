@@ -19,6 +19,7 @@ import {
   Sparkles,
   Trash2,
   Users,
+  Volume2,
   VolumeX
 } from "lucide-react";
 import "./styles.css";
@@ -71,6 +72,7 @@ const emptyConfig = {
   phone: "",
   rsvpUrl: "",
   backgroundMusic: "",
+  musicVolume: 55,
   notes: defaultNotes,
   memories: defaultMemories
 };
@@ -417,6 +419,83 @@ function FlipDigit({ value }) {
   );
 }
 
+// ── Paper Airplane Whoosh Sound ───────────────────────────────────────────────
+// Tiếng máy bay giấy "vèoo" — nhẹ, vui, lao vút qua như trong phim hoạt hình
+function playAirplaneWhoosh() {
+  const AudioContext = window.AudioContext || window.webkitAudioContext;
+  if (!AudioContext) return;
+
+  const ctx = new AudioContext();
+  const t = ctx.currentTime;
+  const dur = 0.85; // nhanh gọn như máy bay giấy
+
+  // ── Master gain ─────────────────────────────────────────────────────────────
+  const master = ctx.createGain();
+  master.gain.setValueAtTime(0.0, t);
+  master.gain.linearRampToValueAtTime(0.7, t + 0.05);   // bật nhanh
+  master.gain.setValueAtTime(0.7, t + 0.30);            // giữ peak khi bay qua
+  master.gain.exponentialRampToValueAtTime(0.001, t + dur); // nhỏ dần khi bay đi
+  master.connect(ctx.destination);
+
+  // ── Whoosh noise chính — lọc bandpass sweep từ cao xuống thấp ───────────────
+  // Tạo buffer noise trắng
+  const bufLen = Math.ceil(ctx.sampleRate * (dur + 0.1));
+  const buf = ctx.createBuffer(1, bufLen, ctx.sampleRate);
+  const data = buf.getChannelData(0);
+  for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
+  const src = ctx.createBufferSource();
+  src.buffer = buf;
+
+  // Bandpass: bắt đầu ở tần số cao (máy bay đến) → quét xuống thấp (bay đi)
+  const filt = ctx.createBiquadFilter();
+  filt.type = "bandpass";
+  filt.frequency.setValueAtTime(3800, t);               // cao — đến gần
+  filt.frequency.linearRampToValueAtTime(4800, t + 0.12); // đỉnh vèoo
+  filt.frequency.exponentialRampToValueAtTime(800, t + dur); // thấp — bay xa
+  filt.Q.value = 1.8; // Q cao → âm "sắc" hơn, rõ tiếng vèoo
+
+  const gNoise = ctx.createGain();
+  gNoise.gain.setValueAtTime(0.0, t);
+  gNoise.gain.linearRampToValueAtTime(0.55, t + 0.06);
+  gNoise.gain.setValueAtTime(0.50, t + 0.25);
+  gNoise.gain.exponentialRampToValueAtTime(0.001, t + dur);
+
+  src.connect(filt); filt.connect(gNoise); gNoise.connect(master);
+  src.start(t); src.stop(t + dur + 0.1);
+
+  // ── Glide tone mỏng — "휙" pitch sweep nghe như tiếng phất ─────────────────
+  const glide = ctx.createOscillator();
+  const gGlide = ctx.createGain();
+  glide.type = "sine";
+  glide.frequency.setValueAtTime(1100, t);               // cao khi đến
+  glide.frequency.exponentialRampToValueAtTime(260, t + dur); // thấp khi đi
+  gGlide.gain.setValueAtTime(0.0, t);
+  gGlide.gain.linearRampToValueAtTime(0.12, t + 0.04);
+  gGlide.gain.exponentialRampToValueAtTime(0.001, t + dur);
+  glide.connect(gGlide); gGlide.connect(master);
+  glide.start(t); glide.stop(t + dur + 0.1);
+
+  // ── Tiếng phất phật cánh giấy — noise burst ngắn lúc cất lên ───────────────
+  const flapLen = Math.ceil(ctx.sampleRate * 0.12);
+  const flapBuf = ctx.createBuffer(1, flapLen, ctx.sampleRate);
+  const flapData = flapBuf.getChannelData(0);
+  for (let i = 0; i < flapLen; i++) {
+    // Envelope hình sin ngắn tạo tiếng "phất" tắt nhanh
+    flapData[i] = (Math.random() * 2 - 1) * Math.sin((i / flapLen) * Math.PI);
+  }
+  const flapSrc = ctx.createBufferSource();
+  flapSrc.buffer = flapBuf;
+  const flapFilt = ctx.createBiquadFilter();
+  flapFilt.type = "highpass";
+  flapFilt.frequency.value = 2500;
+  const gFlap = ctx.createGain();
+  gFlap.gain.value = 0.22;
+  flapSrc.connect(flapFilt); flapFilt.connect(gFlap); gFlap.connect(master);
+  flapSrc.start(t);
+
+  window.setTimeout(() => ctx.close().catch(() => {}), (dur + 0.5) * 1000);
+}
+
 function playDefaultOpeningSound() {
   const AudioContext = window.AudioContext || window.webkitAudioContext;
   if (!AudioContext) return;
@@ -591,6 +670,8 @@ function EnvelopeScreen({ config, guest, onOpen }) {
   const handleOpen = () => {
     if (!greetingDone || opening) return;
     playDefaultOpeningSound();
+    // ✈️ Delay 1020ms để đồng bộ với animation paperPlaneFlight (CSS delay: 1.02s)
+    setTimeout(() => playAirplaneWhoosh(), 1480);
     setOpening(true);
     setConfetti(true);
     setTimeout(() => onOpen(), 2450);
@@ -815,7 +896,11 @@ function Invitation({ config, isOpened }) {
     <main className={`invitation-shell${isOpened ? " card-revealed" : ""}`}>
       {/* Nhạc nền – chỉ phát khi thiếp đã được mở */}
       {config.backgroundMusic && (
-        <BackgroundMusic src={config.backgroundMusic} autoPlay={isOpened} />
+        <BackgroundMusic
+          src={config.backgroundMusic}
+          autoPlay={isOpened}
+          volume={config.musicVolume ?? 55}
+        />
       )}
       <section className="hero">
         <FallingGraduationIcons />
@@ -1419,6 +1504,33 @@ function Admin({ config, setConfig }) {
               ) : (
                 <div className="music-empty">Chưa có nhạc nền. Tải lên file mp3, wav, m4a...</div>
               )}
+
+              {/* ── Thanh điều chỉnh âm lượng ── */}
+              <div className="music-volume-row">
+                <label className="music-volume-label" htmlFor="music-volume-slider">
+                  {
+                    (config.musicVolume ?? 55) === 0
+                      ? <VolumeX size={16} />
+                      : <Volume2 size={16} />
+                  }
+                  <span>Âm lượng nhạc</span>
+                </label>
+                <div className="music-volume-control">
+                  <input
+                    id="music-volume-slider"
+                    type="range"
+                    min="0"
+                    max="100"
+                    step="1"
+                    value={config.musicVolume ?? 55}
+                    onChange={(e) => updateField("musicVolume", Number(e.target.value))}
+                    className="music-volume-slider"
+                    style={{ "--val": config.musicVolume ?? 55 }}
+                  />
+                  <span className="music-volume-pct">{config.musicVolume ?? 55}%</span>
+                </div>
+              </div>
+
               <label className="inline-upload">
                 <Music2 size={18} />
                 {config.backgroundMusic ? "Thay nhạc" : "Tải nhạc lên"}

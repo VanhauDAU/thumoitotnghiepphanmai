@@ -44,6 +44,7 @@ const defaultConfig = {
   phone: "0900000000",
   rsvpUrl: "",
   backgroundMusic: "",
+  musicVolume: 55,
   notes: [
     "Vui long co mat truoc gio bat dau 15 phut.",
     "Trang phuc lich su, uu tien tong mau sang.",
