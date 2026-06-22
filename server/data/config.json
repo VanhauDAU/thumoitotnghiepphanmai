@@ -1,0 +1,54 @@
+{
+  "heroImage": "/uploads/1781771804319-814239357.jpg",
+  "heroImages": [
+    "/uploads/1781771804319-814239357.jpg",
+    "/uploads/1781771986020-372929514.jpg",
+    "/uploads/1781771991890-893014396.jpg",
+    "/uploads/1781772010069-943509256.jpeg",
+    "/uploads/1781772016949-216949717.jpeg"
+  ],
+  "gallery": [
+    "/uploads/1781771261982-711978501.jpg"
+  ],
+  "graduateName": "Lê Thị Hạnh",
+  "degree": "Tan cu nhan Cong nghe thong tin",
+  "school": "Truong Dai hoc",
+  "eventTitle": "Lễ tốt nghiệp",
+  "eventDate": "2026-07-20",
+  "eventTime": "08:30",
+  "eventEndTime": "11:00",
+  "locationName": "Hoi truong A",
+  "locationAddress": "123 Duong Le Loi, Quan 1, TP. Ho Chi Minh",
+  "mapUrl": "",
+  "hostName": "Gia dinh Nguyen",
+  "musicUrl": "/uploads/music/1781836335899-Edd-Sheeran-Perfect-mp3-pm.mp3",
+  "musicTitle": "Edd Sheeran Perfect mp3 pm",
+  "introGreetingImage": "/uploads/intro-greeting.gif",
+  "introGreetingTemplate": "Kính gửi {quan hệ} {người được mời},\nHạnh trân trọng gửi lời mời tham dự lễ tốt nghiệp. Sự hiện diện của quý khách sẽ là niềm vui và vinh hạnh trong ngày đặc biệt này.",
+  "greeting": "Tran trong kinh moi ban den chung vui trong ngay le tot nghiep.",
+  "message": "Su hien dien cua ban la niem vui va niem vinh hanh lon voi minh va gia dinh.",
+  "privateMessage": "",
+  "description": "",
+  "dressCode": "Lich su, trang nhã",
+  "phone": "0900000000",
+  "rsvpUrl": "",
+  "notes": [
+    "Vui lòng có mặt trước giờ bắt đầu 15 phút.",
+    "Trang phục lịch sự, ưu tiên tông màu sáng.",
+    "Có thể gửi lời chúc hoặc xác nhận tham dự qua nút bên dưới."
+  ],
+  "memories": [
+    {
+      "title": "Danh hiệu",
+      "description": "Sinh viên hoàn thành chương trình học với nhiều nỗ lực đáng nhớ."
+    },
+    {
+      "title": "Hoạt động",
+      "description": "Tham gia câu lạc bộ, workshop và các dự án trong thời gian học."
+    },
+    {
+      "title": "Ngoại khóa",
+      "description": "Những chuyến đi, sự kiện và khoảnh khắc cùng bạn bè."
+    }
+  ]
+}
