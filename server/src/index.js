@@ -62,16 +62,23 @@ const defaultConfig = {
   ],
   memories: [
     {
-      title: "Danh hieu",
-      description: "Hoan thanh chuong trinh hoc voi nhieu no luc dang nho."
+      date: "2019-10-06",
+      image: "",
+      title: "Ngay dau tien lac loi",
+      description:
+        "Buoc chan vao canh cong dai hoc, cam thay vua hoi hop vua choang ngop. Ca nhom ban bay gio da gap nhau trong buoi hoc dinh huong dau tien, ai nay deu ngo ngac va lac duong tim phong hoc."
     },
     {
-      title: "Hoat dong",
-      description: "Tham gia cau lac bo, workshop va cac du an trong thoi gian hoc."
+      date: "2022-05-18",
+      image: "",
+      title: "Nhung ngay that cham chi",
+      description: "Tung bai hoc, tung du an va tung lan co gang da tao nen hanh trinh dang nho."
     },
     {
-      title: "Ngoai khoa",
-      description: "Nhung chuyen di, su kien va khoanh khac cung ban be."
+      date: "2026-07-20",
+      image: "",
+      title: "Khoanh khac tot nghiep",
+      description: "Mot dau moc khep lai thanh xuan ruc ro va mo ra chang duong moi."
     }
   ]
 };

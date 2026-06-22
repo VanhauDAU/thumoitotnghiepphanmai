@@ -36,19 +36,19 @@ const defaultNotes = [
 
 const defaultMemories = [
   {
-    date: "",
+    date: "2019-10-06",
     image: "",
     title: "Ngày đầu tiên lạc lối",
-    description: "Bước chân vào cánh cổng đại học, vừa hồi hộp vừa choáng ngợp."
+    description: "Bước chân vào cánh cổng đại học, cảm thấy vừa hồi hộp vừa choáng ngợp. Cả nhóm bạn bây giờ đã gặp nhau trong buổi học định hướng đầu tiên, ai nấy đều ngơ ngác và lạc đường tìm phòng học, tạo nên tràng cười đầu tiên, báo hiệu một hành trình đầy thú vị!"
   },
   {
-    date: "",
+    date: "2022-05-18",
     image: "",
     title: "Những ngày thật chăm chỉ",
     description: "Từng bài học, từng dự án và từng lần cố gắng đã tạo nên hành trình đáng nhớ."
   },
   {
-    date: "",
+    date: "2026-07-20",
     image: "",
     title: "Khoảnh khắc tốt nghiệp",
     description: "Một dấu mốc khép lại thanh xuân rực rỡ và mở ra chặng đường mới."
@@ -183,6 +183,15 @@ function formatDate(value) {
   if (!value) return "";
   return new Intl.DateTimeFormat("vi-VN", {
     weekday: "long",
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric"
+  }).format(new Date(`${value}T00:00:00`));
+}
+
+function formatTimelineDate(value) {
+  if (!value) return "";
+  return new Intl.DateTimeFormat("vi-VN", {
     day: "2-digit",
     month: "2-digit",
     year: "numeric"
@@ -1194,6 +1203,40 @@ function MapSection({ config }) {
   );
 }
 
+function TypewriterTimelineText({ title = "", description = "" }) {
+  const titleText = title ? `${title}${description ? ": " : ""}` : "";
+  const bodyText = description || "";
+
+  return (
+    <>
+      <div className="timeline-readable">
+        {title && <h3>{title}</h3>}
+        {description && <p>{description}</p>}
+      </div>
+      <p className="timeline-typewriter" aria-hidden="true">
+        {Array.from(titleText).map((char, charIndex) => (
+          <span
+            className="timeline-type-char timeline-type-char--title"
+            style={{ "--char-index": charIndex }}
+            key={`title-${charIndex}`}
+          >
+            {char === " " ? "\u00A0" : char}
+          </span>
+        ))}
+        {Array.from(bodyText).map((char, charIndex) => (
+          <span
+            className="timeline-type-char"
+            style={{ "--char-index": titleText.length + charIndex }}
+            key={`body-${charIndex}`}
+          >
+            {char === " " ? "\u00A0" : char}
+          </span>
+        ))}
+      </p>
+    </>
+  );
+}
+
 function TimelineSection({ items = [], config }) {
   const fallbackPhotos = useMemo(() => {
     const merged = [
@@ -1209,14 +1252,21 @@ function TimelineSection({ items = [], config }) {
 
   return (
     <section className="timeline-section" data-reveal>
+      <span className="timeline-doodle timeline-doodle-1" aria-hidden="true">✦</span>
+      <span className="timeline-doodle timeline-doodle-2" aria-hidden="true">♡</span>
+      <span className="timeline-doodle timeline-doodle-3" aria-hidden="true">✧</span>
       <h2>Dòng thời gian</h2>
       <div className="timeline-list">
         {timelineItems.map((item, index) => {
           const image = item.image || fallbackPhotos[index % Math.max(fallbackPhotos.length, 1)] || "";
-          const date = item.date ? formatDate(item.date).replace(/^\S+,\s*/u, "") : "";
+          const date = formatTimelineDate(item.date);
 
           return (
-            <article className="timeline-card" key={`${item.title || item.description}-${index}`}>
+            <article
+              className={`timeline-card${image ? "" : " timeline-card--no-photo"}`}
+              key={`${item.title || item.description}-${index}`}
+              style={{ "--timeline-card-index": index }}
+            >
               {image && (
                 <div className="timeline-photo">
                   <img src={resolveAsset(image)} alt={item.title || `Dòng thời gian ${index + 1}`} />
@@ -1224,13 +1274,54 @@ function TimelineSection({ items = [], config }) {
               )}
               {date && <span className="timeline-date">{date}</span>}
               <div className="timeline-copy">
-                {item.title && <h3>{item.title}</h3>}
-                {item.description && <p>{item.description}</p>}
+                <TypewriterTimelineText title={item.title || ""} description={item.description || ""} />
               </div>
             </article>
           );
         })}
       </div>
+    </section>
+  );
+}
+
+function MemoryGallery({ images = [] }) {
+  const galleryImages = images.slice(0, 8);
+  const [activeIndex, setActiveIndex] = useState(0);
+  const trackRef = useRef(null);
+
+  const updateActiveSlide = useCallback(() => {
+    const track = trackRef.current;
+    if (!track) return;
+    const slide = track.querySelector(".memory-gallery-slide");
+    if (!slide) return;
+    const gap = Number.parseFloat(window.getComputedStyle(track).columnGap || "0");
+    const slideStep = slide.getBoundingClientRect().width + gap;
+    const nextIndex = Math.round(track.scrollLeft / slideStep);
+    setActiveIndex(Math.max(0, Math.min(galleryImages.length - 1, nextIndex)));
+  }, [galleryImages.length]);
+
+  useEffect(() => {
+    setActiveIndex(0);
+  }, [galleryImages.length]);
+
+  if (!galleryImages.length) return null;
+
+  return (
+    <section className="memory-gallery" data-reveal aria-label="Ảnh kỷ niệm">
+      <div className="memory-gallery-track" ref={trackRef} onScroll={updateActiveSlide}>
+        {galleryImages.map((image, index) => (
+          <figure className="memory-gallery-slide" key={image}>
+            <img src={resolveAsset(image)} alt={`Khoảnh khắc ${index + 1}`} />
+          </figure>
+        ))}
+      </div>
+      {galleryImages.length > 1 && (
+        <div className="memory-gallery-dots" aria-hidden="true">
+          {galleryImages.map((image, index) => (
+            <span className={index === activeIndex ? "active" : ""} key={`${image}-dot`} />
+          ))}
+        </div>
+      )}
     </section>
   );
 }
@@ -1290,13 +1381,7 @@ function Invitation({ config, isOpened }) {
         </section>
         <MapSection config={config} />
 
-        {(config.gallery || []).length > 0 && (
-          <section className="memory-gallery" data-reveal>
-            {(config.gallery || []).slice(0, 5).map((image, index) => (
-              <img key={image} src={resolveAsset(image)} alt={`Khoảnh khắc ${index + 1}`} />
-            ))}
-          </section>
-        )}
+        <MemoryGallery images={config.gallery || []} />
 
         <TimelineSection items={config.memories || []} config={config} />
 
@@ -2027,6 +2112,16 @@ function Admin({ config, setConfig }) {
           <MemoryEditor
             items={config.memories || []}
             onChange={(items) => updateField("memories", items)}
+            onUploadImage={async (file) => {
+              setError("");
+              try {
+                const uploaded = await uploadOneImage(file);
+                return uploaded.url;
+              } catch (uploadError) {
+                setError(uploadError.message);
+                throw uploadError;
+              }
+            }}
           />
         </>
       )}
@@ -2492,35 +2587,89 @@ function ListEditor({ title, items, addLabel, onChange }) {
   );
 }
 
-function MemoryEditor({ items, onChange }) {
+function MemoryEditor({ items, onChange, onUploadImage }) {
+  const [uploadingIndex, setUploadingIndex] = useState(null);
+
   const updateItem = (index, key, value) => {
     onChange(items.map((item, itemIndex) => (itemIndex === index ? { ...item, [key]: value } : item)));
   };
 
+  const uploadItemImage = async (index, files) => {
+    const file = files?.[0];
+    if (!file || !onUploadImage) return;
+    setUploadingIndex(index);
+    try {
+      const imageUrl = await onUploadImage(file);
+      if (imageUrl) updateItem(index, "image", imageUrl);
+    } catch {
+      // Error message is surfaced by the admin upload handler.
+    } finally {
+      setUploadingIndex(null);
+    }
+  };
+
   return (
     <section className="admin-panel list-editor">
-      <PanelTitle icon={<Medal size={20} />} title="Kỷ niệm đáng nhớ" />
+      <PanelTitle icon={<CalendarDays size={20} />} title="Dòng thời gian" />
       {items.map((item, index) => (
-        <div className="memory-editor" key={index}>
-          <input
-            value={item.title || ""}
-            onChange={(e) => updateItem(index, "title", e.target.value)}
-            placeholder="Danh hiệu, hoạt động, ngoại khóa..."
-          />
+        <div className="timeline-editor" key={index}>
+          <div className="timeline-editor-fields">
+            <label>
+              <span>Ngày</span>
+              <input
+                type="date"
+                value={item.date || ""}
+                onChange={(e) => updateItem(index, "date", e.target.value)}
+              />
+            </label>
+            <label>
+              <span>Tiêu đề</span>
+              <input
+                value={item.title || ""}
+                onChange={(e) => updateItem(index, "title", e.target.value)}
+                placeholder="Ngày đầu tiên lạc lối..."
+              />
+            </label>
+          </div>
+          <div className="timeline-editor-image">
+            {item.image ? (
+              <div className="timeline-editor-preview">
+                <img src={resolveAsset(item.image)} alt={`Ảnh dòng thời gian ${index + 1}`} />
+                <button type="button" onClick={() => updateItem(index, "image", "")} title="Xóa ảnh">
+                  <Trash2 size={15} />
+                </button>
+              </div>
+            ) : (
+              <div className="timeline-editor-empty">Chưa có ảnh</div>
+            )}
+            <label className="inline-upload">
+              <ImagePlus size={16} />
+              {uploadingIndex === index ? "Đang tải..." : item.image ? "Thay ảnh" : "Thêm ảnh"}
+              <input
+                type="file"
+                accept="image/*"
+                disabled={uploadingIndex === index}
+                onChange={(e) => {
+                  uploadItemImage(index, e.target.files);
+                  e.target.value = "";
+                }}
+              />
+            </label>
+          </div>
           <textarea
             value={item.description || ""}
             onChange={(e) => updateItem(index, "description", e.target.value)}
-            placeholder="Mô tả ngắn"
-            rows={2}
+            placeholder="Viết lại câu chuyện, cảm xúc hoặc dấu mốc đáng nhớ..."
+            rows={4}
           />
-          <button onClick={() => onChange(items.filter((_, itemIndex) => itemIndex !== index))} title="Xóa">
+          <button type="button" className="timeline-editor-delete" onClick={() => onChange(items.filter((_, itemIndex) => itemIndex !== index))} title="Xóa">
             <Trash2 size={18} />
           </button>
         </div>
       ))}
-      <button className="secondary-button" onClick={() => onChange([...items, { title: "", description: "" }])}>
+      <button className="secondary-button" onClick={() => onChange([...items, { date: "", image: "", title: "", description: "" }])}>
         <Plus size={18} />
-        Thêm kỷ niệm
+        Thêm mốc thời gian
       </button>
     </section>
   );
