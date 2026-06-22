@@ -213,7 +213,7 @@ app.get("/api/guests", requireAdmin, async (_req, res, next) => {
 // POST /api/guests — create a new guest
 app.post("/api/guests", requireAdmin, async (req, res, next) => {
   try {
-    const { name, relation, privateMessage } = req.body;
+    const { name, relation, privateMessage, photo, photoCrop } = req.body;
     if (!name || !name.trim()) {
       return res.status(400).json({ message: "Tên khách mời không được để trống" });
     }
@@ -224,6 +224,8 @@ app.post("/api/guests", requireAdmin, async (req, res, next) => {
       name: name.trim(),
       relation: relation || "Bạn",
       privateMessage: privateMessage || "",
+      photo: photo || "",
+      photoCrop: photoCrop || { x: 50, y: 50 },
       createdAt: new Date().toISOString()
     };
     guests.unshift(guest);
@@ -240,12 +242,14 @@ app.put("/api/guests/:id", requireAdmin, async (req, res, next) => {
     const guests = await readGuests();
     const index = guests.findIndex((g) => g.id === req.params.id);
     if (index === -1) return res.status(404).json({ message: "Không tìm thấy khách" });
-    const { name, relation, privateMessage } = req.body;
+    const { name, relation, privateMessage, photo, photoCrop } = req.body;
     guests[index] = {
       ...guests[index],
       name: name !== undefined ? name.trim() : guests[index].name,
       relation: relation !== undefined ? relation : guests[index].relation,
-      privateMessage: privateMessage !== undefined ? privateMessage : guests[index].privateMessage
+      privateMessage: privateMessage !== undefined ? privateMessage : guests[index].privateMessage,
+      photo: photo !== undefined ? photo : (guests[index].photo || ""),
+      photoCrop: photoCrop !== undefined ? photoCrop : (guests[index].photoCrop || { x: 50, y: 50 })
     };
     await writeGuests(guests);
     res.json(guests[index]);
@@ -279,7 +283,9 @@ app.get("/api/guest/:token", async (req, res, next) => {
     res.json({
       name: guest.name,
       relation: guest.relation,
-      privateMessage: guest.privateMessage || ""
+      privateMessage: guest.privateMessage || "",
+      photo: guest.photo || "",
+      photoCrop: guest.photoCrop || { x: 50, y: 50 }
     });
   } catch (error) {
     next(error);

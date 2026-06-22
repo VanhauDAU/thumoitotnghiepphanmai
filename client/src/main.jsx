@@ -419,15 +419,51 @@ function FlipDigit({ value }) {
   );
 }
 
+// ── Shared AudioContext singleton ───────────────────────────────────────────
+// iOS Safari tự động suspend AudioContext khi không có user gesture.
+// Giải pháp:
+//  1. Dùng 1 context chung, KHÔNG BAO GIỜ đóng nó (ctx.close() sẽ khiến lần
+//     phát tiếp theo tạo context mới bên ngoài gesture → iOS chặn).
+//  2. Unlock context ngay khi có touch/click đầu tiên để ctx.state = "running"
+//     trước khi các setTimeout kịp gọi âm thanh.
+let _sharedAudioCtx = null;
+
+function getSharedAudioContext() {
+  const AC = window.AudioContext || window.webkitAudioContext;
+  if (!AC) return null;
+  if (!_sharedAudioCtx) {
+    _sharedAudioCtx = new AC();
+  }
+  return _sharedAudioCtx;
+}
+
+// Gọi hàm này 1 lần trong useEffect để unlock AudioContext sớm nhất có thể
+function unlockAudioContextOnce() {
+  const unlock = () => {
+    const ctx = getSharedAudioContext();
+    if (ctx && ctx.state === "suspended") {
+      ctx.resume().catch(() => {});
+    }
+    // Giải phóng listener sau lần đầu tiên
+    window.removeEventListener("touchstart", unlock, true);
+    window.removeEventListener("touchend",   unlock, true);
+    window.removeEventListener("click",      unlock, true);
+  };
+  window.addEventListener("touchstart", unlock, { capture: true, once: true });
+  window.addEventListener("touchend",   unlock, { capture: true, once: true });
+  window.addEventListener("click",      unlock, { capture: true, once: true });
+}
+
 // ── Paper Airplane Whoosh Sound ───────────────────────────────────────────────
 // Tiếng máy bay giấy "vèoo" — nhẹ, vui, lao vút qua như trong phim hoạt hình
 function playAirplaneWhoosh() {
-  const AudioContext = window.AudioContext || window.webkitAudioContext;
-  if (!AudioContext) return;
+  const ctx = getSharedAudioContext();
+  if (!ctx) return;
 
-  const ctx = new AudioContext();
-  const t = ctx.currentTime;
-  const dur = 0.85; // nhanh gọn như máy bay giấy
+  // iOS: phải resume() trước khi dùng — đây là nguyên nhân chính gây mất tiếng
+  const play = () => {
+    const t = ctx.currentTime;
+    const dur = 0.85;
 
   // ── Master gain ─────────────────────────────────────────────────────────────
   const master = ctx.createGain();
@@ -493,15 +529,23 @@ function playAirplaneWhoosh() {
   flapSrc.connect(flapFilt); flapFilt.connect(gFlap); gFlap.connect(master);
   flapSrc.start(t);
 
-  window.setTimeout(() => ctx.close().catch(() => {}), (dur + 0.5) * 1000);
+  // Không đóng ctx — giữ sống để lần phát tiếp theo không cần tạo mới
+  };
+
+  if (ctx.state === "suspended") {
+    ctx.resume().then(play).catch(() => {});
+  } else {
+    play();
+  }
 }
 
 function playDefaultOpeningSound() {
-  const AudioContext = window.AudioContext || window.webkitAudioContext;
-  if (!AudioContext) return;
+  const ctx = getSharedAudioContext();
+  if (!ctx) return;
 
-  const ctx = new AudioContext();
-  const t = ctx.currentTime;
+  // iOS: phải resume() trước khi dùng — đây là nguyên nhân chính gây mất tiếng
+  const play = () => {
+    const t = ctx.currentTime;
 
   // ── Reverb / Delay tail ───────────────────────────────────────────────────
   // Two feedback delay nodes give a lush "room" feel without a real convolver
@@ -638,7 +682,7 @@ function playDefaultOpeningSound() {
     tone({ freq, start, dur: 1.0, peak: 0.09, type: "sine", detune: i * 2 });
   });
 
-  window.setTimeout(() => ctx.close().catch(() => {}), 3200);
+  // Không đóng ctx — giữ sống để iOS không cần gesture mới khi phát lại
 }
 
 
@@ -904,7 +948,13 @@ function Invitation({ config, isOpened }) {
       )}
       <section className="hero">
         <FallingGraduationIcons />
-        <PhotoCarousel photos={photos} graduateName={config.graduateName} crops={config.heroImageCrops || {}} />
+        <PhotoCarousel
+          photos={photos}
+          graduateName={config.graduateName}
+          crops={config.heroImageCrops || {}}
+          guestPhoto={guest?.photo || ""}
+          guestPhotoCrop={guest?.photoCrop || { x: 50, y: 50 }}
+        />
         <div className="hero-copy">
           <p className="eyebrow">Thư mời dự tốt nghiệp</p>
           <h1>{config.graduateName}</h1>
@@ -1035,27 +1085,48 @@ function Invitation({ config, isOpened }) {
 
 // ── Photo Carousel ─────────────────────────────────────────────────────────────
 
-function PhotoCarousel({ photos, graduateName, crops = {} }) {
+function PhotoCarousel({ photos, graduateName, crops = {}, guestPhoto = "", guestPhotoCrop = { x: 50, y: 50 } }) {
   const [activeIndex, setActiveIndex] = useState(0);
   const touchStart = useRef(0);
   const touchDelta = useRef(0);
-  const hasManyPhotos = photos.length > 1;
+
+  // Khi có guestPhoto: slide 0 = hero[0] + guest (cố định)
+  // slide 1+ = như cũ (các ảnh hero ghep&pại)
+  const slides = useMemo(() => {
+    if (!photos.length) return [];
+    if (guestPhoto) {
+      // Slide 0 riêng: hero[0] + guest
+      const guestSlide = { type: "guest", heroPhoto: photos[0], guestPhoto };
+      // Slide 1+: các ảnh hero còn lại ghép cặp
+      const extraSlides = photos.slice(1).map((image, i) => ({
+        type: "hero",
+        framePhotos: [image, photos[i + 2]].filter(Boolean)
+      }));
+      return [guestSlide, ...extraSlides];
+    }
+    // Không có guest photo → giữ nguyên logic cũ
+    return photos.map((image, index) => ({
+      type: "hero",
+      framePhotos: [image, photos[(index + 1) % photos.length]]
+        .filter((item, itemIndex, items) => item && items.indexOf(item) === itemIndex)
+    }));
+  }, [photos, guestPhoto]);
+
+  const hasManySlides = slides.length > 1;
 
   useEffect(() => {
-    if (!hasManyPhotos) return undefined;
+    if (!hasManySlides) return undefined;
     const timer = window.setInterval(() => {
-      setActiveIndex((current) => (current + 1) % photos.length);
+      setActiveIndex((current) => (current + 1) % slides.length);
     }, 4800);
     return () => window.clearInterval(timer);
-  }, [hasManyPhotos, photos.length]);
+  }, [hasManySlides, slides.length]);
 
-  useEffect(() => {
-    setActiveIndex(0);
-  }, [photos.length]);
+  useEffect(() => { setActiveIndex(0); }, [photos.length, guestPhoto]);
 
   const goTo = (index) => {
-    if (!photos.length) return;
-    setActiveIndex((index + photos.length) % photos.length);
+    if (!slides.length) return;
+    setActiveIndex((index + slides.length) % slides.length);
   };
 
   const onTouchStart = (event) => {
@@ -1072,7 +1143,7 @@ function PhotoCarousel({ photos, graduateName, crops = {} }) {
     goTo(activeIndex + (touchDelta.current < 0 ? 1 : -1));
   };
 
-  if (!photos.length) {
+  if (!slides.length) {
     return (
       <div className="hero-placeholder hero-frame">
         <GraduationCap size={66} />
@@ -1088,34 +1159,47 @@ function PhotoCarousel({ photos, graduateName, crops = {} }) {
       onTouchEnd={onTouchEnd}
     >
       <div className="carousel-track" style={{ transform: `translateX(-${activeIndex * 100}%)` }}>
-        {photos.map((image, index) => {
-          const framePhotos = [
-            image,
-            photos[(index + 1) % photos.length]
-          ].filter((item, itemIndex, items) => item && items.indexOf(item) === itemIndex);
-
+        {slides.map((slide, index) => {
+          if (slide.type === "guest") {
+            // Slide đặc biệt: hero + guest
+            return (
+              <figure className="carousel-slide photo-count-2" key={`guest-slide-${index}`}>
+                <img
+                  src={resolveAsset(slide.heroPhoto)}
+                  alt={`${graduateName}`}
+                  className="photo-card main-photo"
+                  style={{ objectPosition: `${crops[slide.heroPhoto]?.x ?? 50}% ${crops[slide.heroPhoto]?.y ?? 50}%` }}
+                />
+                <img
+                  src={resolveAsset(slide.guestPhoto)}
+                  alt="Ảnh khách mời"
+                  className="photo-card side-photo"
+                  style={{ objectPosition: `${guestPhotoCrop?.x ?? 50}% ${guestPhotoCrop?.y ?? 50}%` }}
+                />
+              </figure>
+            );
+          }
+          // Slide bình thường
           return (
-            <figure className={`carousel-slide photo-count-${framePhotos.length}`} key={`${image}-${index}`}>
-              {framePhotos.map((photo, photoIndex) => (
+            <figure className={`carousel-slide photo-count-${slide.framePhotos.length}`} key={`hero-slide-${index}`}>
+              {slide.framePhotos.map((photo, photoIndex) => (
                 <img
                   key={`${photo}-${photoIndex}`}
                   src={resolveAsset(photo)}
                   alt={`${graduateName} ${photoIndex + 1}`}
                   className={`photo-card ${photoIndex === 0 ? "main-photo" : "side-photo"}`}
-                  style={{
-                    objectPosition: `${crops[photo]?.x ?? 50}% ${crops[photo]?.y ?? 50}%`
-                  }}
+                  style={{ objectPosition: `${crops[photo]?.x ?? 50}% ${crops[photo]?.y ?? 50}%` }}
                 />
               ))}
             </figure>
           );
         })}
       </div>
-      {hasManyPhotos && (
+      {hasManySlides && (
         <div className="carousel-dots" aria-label="Chọn ảnh">
-          {photos.map((image, index) => (
+          {slides.map((_, index) => (
             <button
-              key={image}
+              key={index}
               className={activeIndex === index ? "active" : ""}
               onClick={() => goTo(index)}
               aria-label={`Ảnh ${index + 1}`}
@@ -1126,6 +1210,7 @@ function PhotoCarousel({ photos, graduateName, crops = {} }) {
     </div>
   );
 }
+
 
 function FallingGraduationIcons() {
   return (
@@ -1560,6 +1645,9 @@ function GuestManager({ authHeaders }) {
   const [name, setName] = useState("");
   const [relation, setRelation] = useState("Bạn");
   const [privateMessage, setPrivateMessage] = useState("");
+  const [photo, setPhoto] = useState("");
+  const [photoCrop, setPhotoCrop] = useState({ x: 50, y: 50 });
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState("");
   const [copiedId, setCopiedId] = useState(null);
@@ -1584,6 +1672,24 @@ function GuestManager({ authHeaders }) {
 
   useEffect(() => { fetchGuests(); }, []);
 
+  // Upload ảnh khách mời (dùng chung cho cả form tạo và sửa)
+  const uploadGuestPhoto = async (file, onDone) => {
+    if (!file) return;
+    setUploadingPhoto(true);
+    try {
+      const fd = new FormData();
+      fd.append("image", file);
+      const res = await fetch("/api/upload", { method: "POST", headers: authHeaders(), body: fd });
+      if (!res.ok) throw new Error("Upload ảnh thất bại");
+      const data = await res.json();
+      onDone(data.url);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setUploadingPhoto(false);
+    }
+  };
+
   const createGuest = async (e) => {
     e.preventDefault();
     if (!name.trim()) return;
@@ -1593,7 +1699,7 @@ function GuestManager({ authHeaders }) {
       const res = await fetch("/api/guests", {
         method: "POST",
         headers: { "Content-Type": "application/json", ...authHeaders() },
-        body: JSON.stringify({ name: name.trim(), relation, privateMessage: privateMessage.trim() })
+        body: JSON.stringify({ name: name.trim(), relation, privateMessage: privateMessage.trim(), photo, photoCrop })
       });
       if (!res.ok) {
         const data = await res.json();
@@ -1601,8 +1707,7 @@ function GuestManager({ authHeaders }) {
       }
       const guest = await res.json();
       setGuests((prev) => [guest, ...prev]);
-      setName("");
-      setPrivateMessage("");
+      setName(""); setPrivateMessage(""); setPhoto(""); setPhotoCrop({ x: 50, y: 50 });
     } catch (err) {
       setError(err.message);
     } finally {
@@ -1615,14 +1720,13 @@ function GuestManager({ authHeaders }) {
     setEditDraft({
       name: guest.name,
       relation: guest.relation,
-      privateMessage: guest.privateMessage || ""
+      privateMessage: guest.privateMessage || "",
+      photo: guest.photo || "",
+      photoCrop: guest.photoCrop || { x: 50, y: 50 }
     });
   };
 
-  const cancelEdit = () => {
-    setEditingId(null);
-    setEditDraft({});
-  };
+  const cancelEdit = () => { setEditingId(null); setEditDraft({}); };
 
   const saveEdit = async (id) => {
     setSaving(true);
@@ -1650,10 +1754,7 @@ function GuestManager({ authHeaders }) {
   const deleteGuest = async (id) => {
     setError("");
     try {
-      const res = await fetch(`/api/guests/${id}`, {
-        method: "DELETE",
-        headers: authHeaders()
-      });
+      const res = await fetch(`/api/guests/${id}`, { method: "DELETE", headers: authHeaders() });
       if (!res.ok) throw new Error("Không xóa được khách");
       setGuests((prev) => prev.filter((g) => g.id !== id));
     } catch (err) {
@@ -1669,12 +1770,76 @@ function GuestManager({ authHeaders }) {
     });
   };
 
+  // Sub-component: ô upload + slider crop dùng chung
+  const GuestPhotoEditor = ({ currentPhoto, currentCrop, onPhotoChange, onCropChange }) => (
+    <div className="guest-photo-editor">
+      <span className="guest-form-label">📸 Ảnh khách mời (hiển thị cạnh ảnh tốt nghiệp)</span>
+      <div className="guest-photo-preview-row">
+        {currentPhoto ? (
+          <img
+            src={resolveAsset(currentPhoto)}
+            alt="Ảnh khách"
+            className="guest-photo-thumb"
+            style={{ objectPosition: `${currentCrop?.x ?? 50}% ${currentCrop?.y ?? 50}%` }}
+          />
+        ) : (
+          <div className="guest-photo-empty">Chưa có ảnh</div>
+        )}
+        <label className="guest-photo-upload-btn">
+          <Camera size={15} />
+          {uploadingPhoto ? "Đang tải..." : currentPhoto ? "Đổi ảnh" : "Tải ảnh lên"}
+          <input
+            type="file"
+            accept="image/*"
+            style={{ display: "none" }}
+            disabled={uploadingPhoto}
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) uploadGuestPhoto(file, onPhotoChange);
+              e.target.value = "";
+            }}
+          />
+        </label>
+        {currentPhoto && (
+          <button
+            type="button"
+            className="guest-photo-remove-btn"
+            onClick={() => onPhotoChange("")}
+            title="Xoá ảnh"
+          >
+            <Trash2 size={14} />
+          </button>
+        )}
+      </div>
+      {currentPhoto && (
+        <div className="guest-crop-sliders">
+          <label>
+            <span>Vị trí ngang ({currentCrop?.x ?? 50}%)</span>
+            <input
+              type="range" min="0" max="100"
+              value={currentCrop?.x ?? 50}
+              onChange={(e) => onCropChange({ ...currentCrop, x: Number(e.target.value) })}
+            />
+          </label>
+          <label>
+            <span>Vị trí dọc ({currentCrop?.y ?? 50}%)</span>
+            <input
+              type="range" min="0" max="100"
+              value={currentCrop?.y ?? 50}
+              onChange={(e) => onCropChange({ ...currentCrop, y: Number(e.target.value) })}
+            />
+          </label>
+        </div>
+      )}
+    </div>
+  );
+
   return (
     <section className="admin-panel guest-manager">
       <PanelTitle icon={<Users size={20} />} title="Quản lý khách mời" />
 
       <p className="guest-manager-desc">
-        Tạo link cá nhân cho từng khách. Khi khách mở link, trang sẽ hiển thị lời mời có tên, quan hệ và tin nhắn riêng.
+        Tạo link cá nhân cho từng khách. Khi khách mở link, trang sẽ hiển thị lời mời có tên, quan hệ, tin nhắn riêng và <strong>ảnh của khách</strong> cạnh ảnh tốt nghiệp.
         Link mặc định (không có token) sẽ <strong>không</strong> hiển thị tên người được mời.
       </p>
 
@@ -1711,6 +1876,12 @@ function GuestManager({ authHeaders }) {
             rows={2}
           />
         </label>
+        <GuestPhotoEditor
+          currentPhoto={photo}
+          currentCrop={photoCrop}
+          onPhotoChange={setPhoto}
+          onCropChange={setPhotoCrop}
+        />
         <button type="submit" disabled={creating || !name.trim()} className="guest-create-btn">
           <Link2 size={18} />
           {creating ? "Đang tạo..." : "Tạo link mời"}
@@ -1760,6 +1931,12 @@ function GuestManager({ authHeaders }) {
                       placeholder="Lời nhắn gửi riêng đến khách này..."
                     />
                   </label>
+                  <GuestPhotoEditor
+                    currentPhoto={editDraft.photo || ""}
+                    currentCrop={editDraft.photoCrop || { x: 50, y: 50 }}
+                    onPhotoChange={(url) => setEditDraft((d) => ({ ...d, photo: url }))}
+                    onCropChange={(crop) => setEditDraft((d) => ({ ...d, photoCrop: crop }))}
+                  />
                   <div className="guest-edit-actions">
                     <button
                       type="button"
@@ -1778,8 +1955,18 @@ function GuestManager({ authHeaders }) {
               ) : (
                 <div className="guest-info">
                   <div className="guest-name-row">
-                    <span className="guest-badge">{guest.relation}</span>
-                    <strong>{guest.name}</strong>
+                    {guest.photo && (
+                      <img
+                        src={resolveAsset(guest.photo)}
+                        alt={guest.name}
+                        className="guest-list-photo"
+                        style={{ objectPosition: `${guest.photoCrop?.x ?? 50}% ${guest.photoCrop?.y ?? 50}%` }}
+                      />
+                    )}
+                    <div>
+                      <span className="guest-badge">{guest.relation}</span>
+                      <strong>{guest.name}</strong>
+                    </div>
                   </div>
                   {guest.privateMessage && (
                     <p className="guest-private-msg">💬 {guest.privateMessage}</p>
@@ -1908,6 +2095,10 @@ function App() {
   const { guest, checked: guestChecked } = useGuestToken();
   const isAdmin = window.location.pathname.startsWith("/admin");
   const [isOpened, setIsOpened] = useState(false);
+
+  // Unlock AudioContext sớm nhất khi user chạm/click lần đầu
+  // → đảm bảo tiếng mở thiệp phát được kể cả khi gọi từ setTimeout
+  useEffect(() => { unlockAudioContextOnce(); }, []);
 
   const page = useMemo(() => {
     if (loading || !guestChecked) return <div className="loading">Đang tải...</div>;

@@ -1857,6 +1857,124 @@ a {
   background: #f5ede4;
 }
 
+/* ── Guest Photo Editor ── */
+.guest-photo-editor {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border: 1px dashed #caa98d;
+  border-radius: 10px;
+  background: #fffbf7;
+}
+
+.guest-form-label {
+  font-size: 0.83rem;
+  font-weight: 800;
+  color: #6d5847;
+}
+
+.guest-photo-preview-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.guest-photo-thumb {
+  width: 72px;
+  height: 72px;
+  border-radius: 10px;
+  object-fit: cover;
+  border: 2px solid #d9c8b9;
+  flex-shrink: 0;
+}
+
+.guest-photo-empty {
+  width: 72px;
+  height: 72px;
+  border-radius: 10px;
+  border: 2px dashed #d9c8b9;
+  display: grid;
+  place-items: center;
+  font-size: 0.72rem;
+  color: #b09a87;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+.guest-photo-upload-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  border: 1px solid #c9e4e0;
+  border-radius: 999px;
+  background: #f0faf8;
+  color: #2e5961;
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 180ms ease, transform 180ms ease;
+  white-space: nowrap;
+}
+
+.guest-photo-upload-btn:hover {
+  background: #d8f0ed;
+  transform: translateY(-1px);
+}
+
+.guest-photo-remove-btn {
+  width: 32px;
+  height: 32px;
+  border: 1px solid #f2ccc0;
+  border-radius: 50%;
+  background: #fff7f5;
+  color: #9b3a2c;
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  transition: background 180ms ease;
+}
+
+.guest-photo-remove-btn:hover {
+  background: #fde8e2;
+}
+
+.guest-crop-sliders {
+  display: grid;
+  gap: 8px;
+}
+
+.guest-crop-sliders label {
+  display: grid;
+  gap: 4px;
+}
+
+.guest-crop-sliders label span {
+  font-size: 0.79rem;
+  color: #8a7262;
+  font-weight: 600;
+}
+
+.guest-crop-sliders input[type="range"] {
+  width: 100%;
+  accent-color: #2e5961;
+  height: 4px;
+  cursor: pointer;
+}
+
+/* ── Guest list photo thumbnail (danh sách admin) ── */
+.guest-list-photo {
+  width: 44px;
+  height: 44px;
+  border-radius: 8px;
+  object-fit: cover;
+  border: 2px solid #d9c8b9;
+  flex-shrink: 0;
+}
+
+
+
 @media (max-width: 520px) {
   .guest-form-row {
     grid-template-columns: 1fr;
