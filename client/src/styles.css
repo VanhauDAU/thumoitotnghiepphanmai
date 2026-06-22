@@ -1910,61 +1910,40 @@ a {
   font-family: "Courier New", Courier, monospace;
 }
 
-.timeline-readable {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-  clip: rect(0 0 0 0);
-  clip-path: inset(50%);
-  white-space: nowrap;
-}
-
 .timeline-typewriter {
+  position: relative;
   margin: 0;
   color: #26313d;
   font-size: clamp(0.96rem, 4.25vw, 1.06rem);
   font-weight: 700;
   line-height: 1.78;
-  word-break: break-word;
+  text-align: justify;
+  text-align-last: left;
+  overflow-wrap: normal;
+  word-break: normal;
+  hyphens: none;
 }
 
-.timeline-type-char {
-  opacity: 0;
-  filter: blur(3px);
-  transform: translateY(3px);
-  display: inline-block;
+.timeline-typewriter::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: #fffdf7;
+  transform-origin: right center;
+  transform: scaleX(1);
 }
 
-.timeline-type-char--title {
+[data-reveal].revealed .timeline-typewriter::after {
+  animation: timelineTextReveal 1.9s steps(42, end) calc((var(--timeline-card-index, 0) * 180ms) + 160ms) both;
+}
+
+.timeline-typewriter strong {
   color: #151d29;
   font-weight: 950;
 }
 
-[data-reveal].revealed .timeline-type-char {
-  animation: timelineTypeIn 120ms ease-out both;
-  animation-delay: calc((var(--timeline-card-index, 0) * 160ms) + (var(--char-index) * 18ms) + 180ms);
-}
-
-.timeline-readable h3 {
-  display: inline;
-  margin: 0;
-  font-size: clamp(0.96rem, 4.25vw, 1.06rem);
-  font-weight: 950;
-  line-height: 1.78;
-}
-
-.timeline-readable p {
-  display: inline;
-  color: #26313d;
-  font-size: clamp(0.96rem, 4.25vw, 1.06rem);
-  font-weight: 700;
-  line-height: 1.78;
-  word-break: break-word;
-}
-
-.timeline-readable h3+p::before {
-  content: ": ";
+.timeline-typewriter span {
+  color: inherit;
 }
 
 .timeline-card--no-photo .timeline-date {
@@ -2496,6 +2475,68 @@ a {
   font-weight: 800;
 }
 
+.gate-assets-panel {
+  display: grid;
+  gap: 12px;
+}
+
+.gate-assets-editor {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+}
+
+.gate-asset-item {
+  display: grid;
+  gap: 10px;
+  align-content: start;
+  padding: 12px;
+  border: 1px solid #eadbca;
+  border-radius: 8px;
+  background: #fff;
+}
+
+.gate-asset-item > span {
+  color: #6d5847;
+  font-size: 0.84rem;
+  font-weight: 850;
+}
+
+.gate-asset-preview,
+.gate-asset-empty {
+  position: relative;
+  min-height: 126px;
+  border-radius: 8px;
+}
+
+.gate-asset-preview {
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  background:
+    linear-gradient(45deg, #f7efe7 25%, transparent 25% 75%, #f7efe7 75%),
+    linear-gradient(45deg, #f7efe7 25%, #fff 25% 75%, #f7efe7 75%);
+  background-position: 0 0, 10px 10px;
+  background-size: 20px 20px;
+}
+
+.gate-asset-preview img {
+  width: 100%;
+  height: 126px;
+  object-fit: contain;
+  padding: 10px;
+}
+
+.gate-asset-empty {
+  display: grid;
+  place-items: center;
+  border: 1px dashed #d8bba2;
+  color: #8a725e;
+  background: #fff8f1;
+  font-size: 0.86rem;
+  font-weight: 800;
+}
+
 .music-panel {
   display: grid;
   gap: 12px;
@@ -2730,11 +2771,9 @@ a {
   }
 }
 
-@keyframes timelineTypeIn {
+@keyframes timelineTextReveal {
   to {
-    opacity: 1;
-    filter: blur(0);
-    transform: translateY(0);
+    transform: scaleX(0);
   }
 }
 
@@ -3383,7 +3422,7 @@ a {
 
 /* Khi bắt đầu mở – màn hình phong bì mờ dần và thu nhỏ lên */
 .envelope-screen.opening {
-  animation: envelopeScreenExit 520ms ease 1.95s both;
+  animation: envelopeScreenExit 720ms ease 3.85s both;
   pointer-events: none;
 }
 
@@ -3391,6 +3430,174 @@ a {
   to {
     opacity: 0;
     transform: scale(1.06);
+  }
+}
+
+.graduation-gate-effect {
+  position: fixed;
+  inset: 0;
+  z-index: 44;
+  pointer-events: none;
+  opacity: 0;
+  overflow: hidden;
+}
+
+.envelope-screen.opening .graduation-gate-effect {
+  opacity: 1;
+}
+
+.gate-panel {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: calc(50% + 8px);
+  background:
+    radial-gradient(circle at 22px 22px, rgb(255 213 97 / 28%) 0 2px, transparent 3px),
+    radial-gradient(circle at 44px 44px, rgb(255 213 97 / 18%) 0 2px, transparent 3px),
+    linear-gradient(90deg, rgb(255 214 51 / 94%) 0 7px, transparent 7px 100%),
+    linear-gradient(160deg, #c98212 0%, #ad650e 48%, #8e4f08 100%);
+  background-size: 56px 56px, 56px 56px, 100% 100%, 100% 100%;
+  box-shadow:
+    inset 0 0 0 1px rgb(255 231 119 / 20%),
+    inset 0 0 42px rgb(77 35 0 / 22%);
+}
+
+.gate-panel::before,
+.gate-panel::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  opacity: 0.28;
+  background:
+    radial-gradient(ellipse at center, transparent 0 34%, rgb(255 218 91 / 80%) 35% 37%, transparent 38%),
+    linear-gradient(45deg, transparent 45%, rgb(255 218 91 / 68%) 46% 48%, transparent 49%),
+    linear-gradient(-45deg, transparent 45%, rgb(255 218 91 / 68%) 46% 48%, transparent 49%);
+  background-size: 58px 58px;
+}
+
+.gate-panel::after {
+  inset: 0 0 0 auto;
+  width: 7px;
+  opacity: 0.78;
+  background: linear-gradient(180deg, #ffe44a, #dba915, #ffe44a);
+}
+
+.gate-panel-left {
+  left: 0;
+  transform-origin: left center;
+}
+
+.gate-panel-right {
+  right: 0;
+  transform-origin: right center;
+}
+
+.gate-panel-right::after {
+  left: 0;
+  right: auto;
+}
+
+.envelope-screen.opening .gate-panel-left {
+  animation: gateOpenLeft 3.45s cubic-bezier(0.18, 0.82, 0.22, 1) 180ms both;
+}
+
+.envelope-screen.opening .gate-panel-right {
+  animation: gateOpenRight 3.45s cubic-bezier(0.18, 0.82, 0.22, 1) 180ms both;
+}
+
+.gate-graduation-props {
+  position: absolute;
+  left: 50%;
+  top: 52%;
+  z-index: 3;
+  width: min(350px, 78vw);
+  height: min(230px, 52vw);
+  opacity: 0;
+  filter: drop-shadow(0 26px 30px rgb(0 0 0 / 34%));
+  transform: translate(-50%, -50%) scale(0.74) rotate(-8deg);
+}
+
+.envelope-screen.opening .gate-graduation-props {
+  animation: gatePropsReveal 3.25s cubic-bezier(0.16, 1, 0.3, 1) 360ms both;
+}
+
+.gate-prop-image {
+  position: absolute;
+  display: block;
+  object-fit: contain;
+  pointer-events: none;
+  user-select: none;
+}
+
+.gate-cap-image {
+  left: 5%;
+  top: 2%;
+  z-index: 2;
+  width: 62%;
+  height: 62%;
+  transform: rotate(-12deg);
+}
+
+.gate-diploma-image {
+  left: 18%;
+  bottom: 0;
+  z-index: 1;
+  width: 72%;
+  height: 54%;
+  transform: rotate(12deg);
+}
+
+.graduation-gate-effect .fireworks {
+  z-index: 5;
+}
+
+@keyframes gateOpenLeft {
+  0% {
+    transform: translateX(0);
+  }
+
+  26% {
+    transform: translateX(0);
+  }
+
+  100% {
+    transform: translateX(calc(-100% + 34px));
+  }
+}
+
+@keyframes gateOpenRight {
+  0% {
+    transform: translateX(0);
+  }
+
+  26% {
+    transform: translateX(0);
+  }
+
+  100% {
+    transform: translateX(calc(100% - 34px));
+  }
+}
+
+@keyframes gatePropsReveal {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.62) rotate(-12deg);
+  }
+
+  22% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(0.9) rotate(-8deg);
+  }
+
+  76% {
+    opacity: 1;
+    transform: translate(-50%, -54%) scale(1.04) rotate(-5deg);
+  }
+
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -66%) scale(0.86) rotate(5deg);
   }
 }
 
@@ -4456,6 +4663,31 @@ a {
 
 .envelope-screen.opening .envelope-card-peek {
   animation: envelopeFoldAway 720ms ease 980ms both;
+}
+
+/* Khi mở chỉ dùng hiệu ứng cổng, không chạy lại animation phong bì cũ. */
+.envelope-screen.opening .env-header,
+.envelope-screen.opening .env-photo-stage,
+.envelope-screen.opening .env-envelope-row,
+.envelope-screen.opening .env-hint {
+  opacity: 0;
+  transform: none;
+  filter: none;
+  transition: opacity 120ms ease;
+}
+
+.envelope-screen.opening .envelope-wrap,
+.envelope-screen.opening .env-mascot-gif,
+.envelope-screen.opening .letter-card-reveal,
+.envelope-screen.opening .envelope-flap,
+.envelope-screen.opening .envelope-body,
+.envelope-screen.opening .envelope-card-peek,
+.envelope-screen.opening .envelope-seal,
+.envelope-screen.opening .flying-paper-plane {
+  opacity: 0;
+  transform: none;
+  animation: none;
+  transition: none;
 }
 
 .flying-paper-plane {

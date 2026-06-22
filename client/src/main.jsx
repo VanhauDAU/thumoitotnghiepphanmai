@@ -61,6 +61,8 @@ const emptyConfig = {
   gallery: [],
   schoolLogo: "",
   sashImage: "",
+  gateCapImage: "",
+  gateDiplomaImage: "",
   showcaseCaption: "",
   graduateName: "",
   degree: "",
@@ -654,7 +656,6 @@ function IntroPortrait({ image, label, name, className = "" }) {
 
 function EnvelopeScreen({ config, guest, onOpen }) {
   const [opening, setOpening] = useState(false);
-  const [confetti, setConfetti] = useState(false);
   const envelopeRef = useRef(null);
   const introVoicePlayedRef = useRef(false);
   const greetingText = useMemo(
@@ -682,8 +683,7 @@ function EnvelopeScreen({ config, guest, onOpen }) {
     if (!greetingDone || opening) return;
     playOpenSound();
     setOpening(true);
-    setConfetti(true);
-    setTimeout(() => onOpen(), 2450);
+    setTimeout(() => onOpen(), 4300);
   };
 
   const onMouseMove = useCallback((e) => {
@@ -834,11 +834,24 @@ function EnvelopeScreen({ config, guest, onOpen }) {
               />
             ))}
           </div>
-          <ConfettiBurst active={confetti} />
-          <div className="flying-paper-plane" aria-hidden="true" />
         </div>
       </div>
-      <Fireworks active={confetti} />
+
+      <div className="graduation-gate-effect" aria-hidden="true">
+        <div className="gate-panel gate-panel-left" />
+        <div className="gate-panel gate-panel-right" />
+        {(config.gateCapImage || config.gateDiplomaImage) && (
+          <div className="gate-graduation-props">
+            {config.gateCapImage && (
+              <img className="gate-prop-image gate-cap-image" src={resolveAsset(config.gateCapImage)} alt="" />
+            )}
+            {config.gateDiplomaImage && (
+              <img className="gate-prop-image gate-diploma-image" src={resolveAsset(config.gateDiplomaImage)} alt="" />
+            )}
+          </div>
+        )}
+        <Fireworks active={opening} />
+      </div>
 
       <p className="env-hint">
         {greetingDone ? "Click vào tấm thiệp để mở" : "Lời chào đang được gửi đến bạn..."}
@@ -1204,36 +1217,11 @@ function MapSection({ config }) {
 }
 
 function TypewriterTimelineText({ title = "", description = "" }) {
-  const titleText = title ? `${title}${description ? ": " : ""}` : "";
-  const bodyText = description || "";
-
   return (
-    <>
-      <div className="timeline-readable">
-        {title && <h3>{title}</h3>}
-        {description && <p>{description}</p>}
-      </div>
-      <p className="timeline-typewriter" aria-hidden="true">
-        {Array.from(titleText).map((char, charIndex) => (
-          <span
-            className="timeline-type-char timeline-type-char--title"
-            style={{ "--char-index": charIndex }}
-            key={`title-${charIndex}`}
-          >
-            {char === " " ? "\u00A0" : char}
-          </span>
-        ))}
-        {Array.from(bodyText).map((char, charIndex) => (
-          <span
-            className="timeline-type-char"
-            style={{ "--char-index": titleText.length + charIndex }}
-            key={`body-${charIndex}`}
-          >
-            {char === " " ? "\u00A0" : char}
-          </span>
-        ))}
-      </p>
-    </>
+    <p className="timeline-typewriter">
+      {title && <strong>{title}{description ? ": " : ""}</strong>}
+      {description && <span>{description}</span>}
+    </p>
   );
 }
 
@@ -1625,6 +1613,10 @@ function Admin({ config, setConfig }) {
         updateField("sashImage", urls[0] || "");
       } else if (target === "introGreetingImage") {
         updateField("introGreetingImage", urls[0] || "");
+      } else if (target === "gateCapImage") {
+        updateField("gateCapImage", urls[0] || "");
+      } else if (target === "gateDiplomaImage") {
+        updateField("gateDiplomaImage", urls[0] || "");
       } else {
         updateField("gallery", [...(config.gallery || []), ...urls]);
       }
@@ -1968,6 +1960,44 @@ function Admin({ config, setConfig }) {
                   onChange={(e) => uploadImages(e.target.files, "introGreetingImage")}
                 />
               </label>
+            </div>
+          </section>
+
+          <section className="admin-panel gate-assets-panel">
+            <PanelTitle icon={<GraduationCap size={20} />} title="Ảnh hiệu ứng mở cổng" />
+            <div className="gate-assets-editor">
+              {[
+                ["gateCapImage", "Ảnh mũ tốt nghiệp"],
+                ["gateDiplomaImage", "Ảnh bằng tốt nghiệp"]
+              ].map(([key, label]) => (
+                <div className="gate-asset-item" key={key}>
+                  <span>{label}</span>
+                  {config[key] ? (
+                    <div className="gate-asset-preview">
+                      <img src={resolveAsset(config[key])} alt={label} />
+                      <button
+                        type="button"
+                        className="delete-image-button"
+                        onClick={() => updateField(key, "")}
+                        title={`Xóa ${label.toLowerCase()}`}
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="gate-asset-empty">Chưa có ảnh</div>
+                  )}
+                  <label className="inline-upload">
+                    <ImagePlus size={18} />
+                    {config[key] ? "Thay ảnh" : "Thêm ảnh"}
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={(e) => uploadImages(e.target.files, key)}
+                    />
+                  </label>
+                </div>
+              ))}
             </div>
           </section>
 
