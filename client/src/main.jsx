@@ -683,6 +683,13 @@ function playDefaultOpeningSound() {
   });
 
   // Không đóng ctx — giữ sống để iOS không cần gesture mới khi phát lại
+  };
+
+  if (ctx.state === "suspended") {
+    ctx.resume().then(play).catch(() => {});
+  } else {
+    play();
+  }
 }
 
 
