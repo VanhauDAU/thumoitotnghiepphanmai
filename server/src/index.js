@@ -3,6 +3,7 @@ import express from "express";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { randomUUID } from "node:crypto";
 import multer from "multer";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -12,6 +13,7 @@ const port = process.env.PORT || 4000;
 const dataDir = process.env.DATA_DIR || path.resolve(__dirname, "../data");
 const uploadDir = process.env.UPLOAD_DIR || path.resolve(__dirname, "../uploads");
 const configPath = path.join(dataDir, "config.json");
+const guestsPath = path.join(dataDir, "guests.json");
 const clientDist = path.join(rootDir, "client/dist");
 const adminToken = process.env.ADMIN_TOKEN || "";
 
@@ -68,6 +70,27 @@ async function ensureStorage() {
   } catch {
     await fs.writeFile(configPath, JSON.stringify(defaultConfig, null, 2));
   }
+  try {
+    await fs.access(guestsPath);
+  } catch {
+    await fs.writeFile(guestsPath, JSON.stringify([], null, 2));
+  }
+}
+
+async function readGuests() {
+  await ensureStorage();
+  try {
+    const raw = await fs.readFile(guestsPath, "utf8");
+    return JSON.parse(raw);
+  } catch {
+    return [];
+  }
+}
+
+async function writeGuests(guests) {
+  await ensureStorage();
+  await fs.writeFile(guestsPath, JSON.stringify(guests, null, 2));
+  return guests;
 }
 
 async function readConfig() {
@@ -151,6 +174,95 @@ app.post("/api/upload", requireAdmin, upload.single("image"), (req, res) => {
     filename: req.file.filename
   });
 });
+
+// ── Guest API ────────────────────────────────────────────────────────────────
+
+// GET /api/guests — list all guests (admin)
+app.get("/api/guests", requireAdmin, async (_req, res, next) => {
+  try {
+    res.json(await readGuests());
+  } catch (error) {
+    next(error);
+  }
+});
+
+// POST /api/guests — create a new guest
+app.post("/api/guests", requireAdmin, async (req, res, next) => {
+  try {
+    const { name, relation, privateMessage } = req.body;
+    if (!name || !name.trim()) {
+      return res.status(400).json({ message: "Tên khách mời không được để trống" });
+    }
+    const guests = await readGuests();
+    const guest = {
+      id: randomUUID(),
+      token: randomUUID(),
+      name: name.trim(),
+      relation: relation || "Bạn",
+      privateMessage: privateMessage || "",
+      createdAt: new Date().toISOString()
+    };
+    guests.unshift(guest);
+    await writeGuests(guests);
+    res.status(201).json(guest);
+  } catch (error) {
+    next(error);
+  }
+});
+
+// PUT /api/guests/:id — update a guest
+app.put("/api/guests/:id", requireAdmin, async (req, res, next) => {
+  try {
+    const guests = await readGuests();
+    const index = guests.findIndex((g) => g.id === req.params.id);
+    if (index === -1) return res.status(404).json({ message: "Không tìm thấy khách" });
+    const { name, relation, privateMessage } = req.body;
+    guests[index] = {
+      ...guests[index],
+      name: name !== undefined ? name.trim() : guests[index].name,
+      relation: relation !== undefined ? relation : guests[index].relation,
+      privateMessage: privateMessage !== undefined ? privateMessage : guests[index].privateMessage
+    };
+    await writeGuests(guests);
+    res.json(guests[index]);
+  } catch (error) {
+    next(error);
+  }
+});
+
+// DELETE /api/guests/:id — delete a guest
+app.delete("/api/guests/:id", requireAdmin, async (req, res, next) => {
+  try {
+    const guests = await readGuests();
+    const filtered = guests.filter((g) => g.id !== req.params.id);
+    if (filtered.length === guests.length) {
+      return res.status(404).json({ message: "Không tìm thấy khách" });
+    }
+    await writeGuests(filtered);
+    res.json({ ok: true });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// GET /api/guest/:token — public: get guest by invite token
+app.get("/api/guest/:token", async (req, res, next) => {
+  try {
+    const guests = await readGuests();
+    const guest = guests.find((g) => g.token === req.params.token);
+    if (!guest) return res.status(404).json({ message: "Không tìm thấy" });
+    // Chỉ trả về thông tin cần thiết cho trang mời (không expose id nội bộ)
+    res.json({
+      name: guest.name,
+      relation: guest.relation,
+      privateMessage: guest.privateMessage || ""
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// ── Static ────────────────────────────────────────────────────────────────────
 
 app.use(express.static(clientDist));
 

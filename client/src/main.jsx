@@ -578,7 +578,7 @@ function Invitation({ config, isOpened }) {
         <PhotoCarousel photos={photos} graduateName={config.graduateName} />
         <div className="hero-copy">
           <p className="eyebrow">Thư mời dự tốt nghiệp</p>
-          <h1>{config.graduateName}</h1>
+          <h2>{config.graduateName}</h2>
           <p>{config.degree}</p>
           <span>{config.school}</span>
         </div>
@@ -604,12 +604,13 @@ function Invitation({ config, isOpened }) {
         {config.description && <span>{config.description}</span>}
       </section>
 
-      {config.privateMessage && (
+      {/* Lời nhắn riêng: ưu tiên tin nhắn của khách, fallback về config chung */}
+      {(guest?.privateMessage || config.privateMessage) && (
         <section className="content-section private-message" data-reveal>
           <Heart size={22} />
           <div>
             <p className="eyebrow">Lời nhắn gửi riêng</p>
-            <strong>{config.privateMessage}</strong>
+            <strong>{guest?.privateMessage || config.privateMessage}</strong>
           </div>
         </section>
       )}
@@ -1082,9 +1083,13 @@ function GuestManager({ authHeaders }) {
   const [loading, setLoading] = useState(true);
   const [name, setName] = useState("");
   const [relation, setRelation] = useState("Bạn");
+  const [privateMessage, setPrivateMessage] = useState("");
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState("");
   const [copiedId, setCopiedId] = useState(null);
+  const [editingId, setEditingId] = useState(null);
+  const [editDraft, setEditDraft] = useState({});
+  const [saving, setSaving] = useState(false);
 
   const baseUrl = `${window.location.protocol}//${window.location.host}`;
 
@@ -1101,9 +1106,7 @@ function GuestManager({ authHeaders }) {
     }
   };
 
-  useEffect(() => {
-    fetchGuests();
-  }, []);
+  useEffect(() => { fetchGuests(); }, []);
 
   const createGuest = async (e) => {
     e.preventDefault();
@@ -1114,7 +1117,7 @@ function GuestManager({ authHeaders }) {
       const res = await fetch("/api/guests", {
         method: "POST",
         headers: { "Content-Type": "application/json", ...authHeaders() },
-        body: JSON.stringify({ name: name.trim(), relation })
+        body: JSON.stringify({ name: name.trim(), relation, privateMessage: privateMessage.trim() })
       });
       if (!res.ok) {
         const data = await res.json();
@@ -1123,10 +1126,48 @@ function GuestManager({ authHeaders }) {
       const guest = await res.json();
       setGuests((prev) => [guest, ...prev]);
       setName("");
+      setPrivateMessage("");
     } catch (err) {
       setError(err.message);
     } finally {
       setCreating(false);
+    }
+  };
+
+  const startEdit = (guest) => {
+    setEditingId(guest.id);
+    setEditDraft({
+      name: guest.name,
+      relation: guest.relation,
+      privateMessage: guest.privateMessage || ""
+    });
+  };
+
+  const cancelEdit = () => {
+    setEditingId(null);
+    setEditDraft({});
+  };
+
+  const saveEdit = async (id) => {
+    setSaving(true);
+    setError("");
+    try {
+      const res = await fetch(`/api/guests/${id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", ...authHeaders() },
+        body: JSON.stringify(editDraft)
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.message || "Không lưu được");
+      }
+      const updated = await res.json();
+      setGuests((prev) => prev.map((g) => g.id === id ? updated : g));
+      setEditingId(null);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -1157,7 +1198,7 @@ function GuestManager({ authHeaders }) {
       <PanelTitle icon={<Users size={20} />} title="Quản lý khách mời" />
 
       <p className="guest-manager-desc">
-        Tạo link cá nhân cho từng khách. Khi khách mở link, trang sẽ hiển thị lời mời có tên và quan hệ riêng.
+        Tạo link cá nhân cho từng khách. Khi khách mở link, trang sẽ hiển thị lời mời có tên, quan hệ và tin nhắn riêng.
         Link mặc định (không có token) sẽ <strong>không</strong> hiển thị tên người được mời.
       </p>
 
@@ -1185,6 +1226,15 @@ function GuestManager({ authHeaders }) {
             </select>
           </label>
         </div>
+        <label className="guest-form-field wide">
+          <span>Tin nhắn riêng cho khách này (không bắt buộc)</span>
+          <textarea
+            value={privateMessage}
+            onChange={(e) => setPrivateMessage(e.target.value)}
+            placeholder="Ví dụ: Cảm ơn bạn đã luôn đồng hành trong suốt 4 năm học..."
+            rows={2}
+          />
+        </label>
         <button type="submit" disabled={creating || !name.trim()} className="guest-create-btn">
           <Link2 size={18} />
           {creating ? "Đang tạo..." : "Tạo link mời"}
@@ -1199,42 +1249,105 @@ function GuestManager({ authHeaders }) {
         )}
         {guests.map((guest) => {
           const link = `${baseUrl}/?token=${guest.token}`;
+          const isEditing = editingId === guest.id;
           return (
-            <div className="guest-item" key={guest.id}>
-              <div className="guest-info">
-                <div className="guest-name-row">
-                  <span className="guest-badge">{guest.relation}</span>
-                  <strong>{guest.name}</strong>
+            <div className={`guest-item${isEditing ? " guest-item-editing" : ""}`} key={guest.id}>
+              {isEditing ? (
+                <div className="guest-edit-form">
+                  <div className="guest-form-row">
+                    <label className="guest-form-field">
+                      <span>Tên</span>
+                      <input
+                        type="text"
+                        value={editDraft.name}
+                        onChange={(e) => setEditDraft((d) => ({ ...d, name: e.target.value }))}
+                      />
+                    </label>
+                    <label className="guest-form-field">
+                      <span>Quan hệ</span>
+                      <select
+                        value={editDraft.relation}
+                        onChange={(e) => setEditDraft((d) => ({ ...d, relation: e.target.value }))}
+                      >
+                        {RELATION_OPTIONS.map((r) => (
+                          <option key={r} value={r}>{r}</option>
+                        ))}
+                      </select>
+                    </label>
+                  </div>
+                  <label className="guest-form-field wide">
+                    <span>Tin nhắn riêng</span>
+                    <textarea
+                      value={editDraft.privateMessage}
+                      onChange={(e) => setEditDraft((d) => ({ ...d, privateMessage: e.target.value }))}
+                      rows={2}
+                      placeholder="Lời nhắn gửi riêng đến khách này..."
+                    />
+                  </label>
+                  <div className="guest-edit-actions">
+                    <button
+                      type="button"
+                      className="guest-save-btn"
+                      onClick={() => saveEdit(guest.id)}
+                      disabled={saving || !editDraft.name?.trim()}
+                    >
+                      <Save size={15} />
+                      {saving ? "Đang lưu..." : "Lưu"}
+                    </button>
+                    <button type="button" className="guest-cancel-btn" onClick={cancelEdit}>
+                      Huỷ
+                    </button>
+                  </div>
                 </div>
-                <a
-                  className="guest-link"
-                  href={link}
-                  target="_blank"
-                  rel="noreferrer"
-                  title="Mở link mời"
-                >
-                  {link}
-                </a>
-              </div>
-              <div className="guest-actions">
-                <button
-                  type="button"
-                  className={`copy-btn ${copiedId === guest.token ? "copied" : ""}`}
-                  onClick={() => copyLink(guest.token)}
-                  title="Sao chép link"
-                >
-                  {copiedId === guest.token ? <Check size={16} /> : <Copy size={16} />}
-                  {copiedId === guest.token ? "Đã sao chép" : "Sao chép"}
-                </button>
-                <button
-                  type="button"
-                  className="delete-guest-btn"
-                  onClick={() => deleteGuest(guest.id)}
-                  title="Xóa khách"
-                >
-                  <Trash2 size={16} />
-                </button>
-              </div>
+              ) : (
+                <div className="guest-info">
+                  <div className="guest-name-row">
+                    <span className="guest-badge">{guest.relation}</span>
+                    <strong>{guest.name}</strong>
+                  </div>
+                  {guest.privateMessage && (
+                    <p className="guest-private-msg">💬 {guest.privateMessage}</p>
+                  )}
+                  <a
+                    className="guest-link"
+                    href={link}
+                    target="_blank"
+                    rel="noreferrer"
+                    title="Mở link mời"
+                  >
+                    {link}
+                  </a>
+                </div>
+              )}
+              {!isEditing && (
+                <div className="guest-actions">
+                  <button
+                    type="button"
+                    className="edit-guest-btn"
+                    onClick={() => startEdit(guest)}
+                    title="Sửa thông tin khách"
+                  >
+                    ✏️ Sửa
+                  </button>
+                  <button
+                    type="button"
+                    className={`copy-btn ${copiedId === guest.token ? "copied" : ""}`}
+                    onClick={() => copyLink(guest.token)}
+                    title="Sao chép link"
+                  >
+                    {copiedId === guest.token ? <Check size={16} /> : <Copy size={16} />}
+                    {copiedId === guest.token ? "Đã sao chép" : "Sao chép"}
+                  </button>
+                  <button
+                    type="button"
+                    className="delete-guest-btn"
+                    onClick={() => deleteGuest(guest.id)}
+                    title="Xóa khách"
+                  >
+                    <Trash2 size={16} />
+                  </button>
+                </div>
+              )}
             </div>
           );
         })}

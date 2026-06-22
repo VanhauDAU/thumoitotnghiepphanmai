@@ -1391,6 +1391,123 @@ a {
   transform: scale(1.08);
 }
 
+/* ── Guest edit button ── */
+.edit-guest-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 13px;
+  border: 1px solid #d3c5b4;
+  border-radius: 999px;
+  background: #fdf8f4;
+  color: #6b4f38;
+  font-size: 0.82rem;
+  font-weight: 700;
+  white-space: nowrap;
+  transition: background 180ms ease, transform 180ms ease;
+  flex: 0 0 auto;
+}
+
+.edit-guest-btn:hover {
+  background: #f3e9de;
+  transform: translateY(-1px);
+}
+
+/* ── Guest private message preview ── */
+.guest-private-msg {
+  margin: 2px 0 0;
+  font-size: 0.82rem;
+  color: #6d5847;
+  font-style: italic;
+  line-height: 1.4;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ── Guest item in edit mode ── */
+.guest-item-editing {
+  flex-direction: column;
+  border-color: #986744;
+  box-shadow: 0 0 0 3px rgb(152 103 68 / 14%);
+}
+
+.guest-edit-form {
+  width: 100%;
+  display: grid;
+  gap: 10px;
+}
+
+.guest-form-field.wide {
+  grid-column: 1 / -1;
+}
+
+.guest-form-field textarea {
+  width: 100%;
+  border: 1px solid #d9c8b9;
+  border-radius: 8px;
+  padding: 8px 12px;
+  background: #fff;
+  color: #2c241e;
+  font-size: 0.93rem;
+  line-height: 1.5;
+  resize: vertical;
+  outline: none;
+  transition: border-color 180ms ease, box-shadow 180ms ease;
+  font-family: inherit;
+}
+
+.guest-form-field textarea:focus {
+  border-color: #986744;
+  box-shadow: 0 0 0 4px rgb(152 103 68 / 14%);
+}
+
+/* ── Guest edit action buttons ── */
+.guest-edit-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.guest-save-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 18px;
+  border: 0;
+  border-radius: 999px;
+  background: #2e5961;
+  color: #fff;
+  font-size: 0.88rem;
+  font-weight: 800;
+  transition: background 180ms ease, transform 180ms ease, opacity 180ms ease;
+}
+
+.guest-save-btn:hover:not(:disabled) {
+  background: #234850;
+  transform: translateY(-1px);
+}
+
+.guest-save-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.guest-cancel-btn {
+  padding: 8px 14px;
+  border: 1px solid #d3c5b4;
+  border-radius: 999px;
+  background: transparent;
+  color: #7a6251;
+  font-size: 0.88rem;
+  font-weight: 700;
+  transition: background 180ms ease;
+}
+
+.guest-cancel-btn:hover {
+  background: #f5ede4;
+}
+
 @media (max-width: 520px) {
   .guest-form-row {
     grid-template-columns: 1fr;
