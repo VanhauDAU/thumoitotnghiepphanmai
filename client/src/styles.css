@@ -257,6 +257,7 @@ a {
   box-shadow:
     0 18px 36px rgb(70 45 28 / 14%),
     inset 0 0 0 5px rgb(255 255 255 / 58%);
+  isolation: isolate;
 }
 
 .graduate-photo-carousel::before {
@@ -278,6 +279,22 @@ a {
   background: linear-gradient(115deg, transparent 38%, rgb(255 255 255 / 34%) 48%, transparent 58%);
   transform: translateX(-62%) rotate(8deg);
   animation: showcaseShine 5.8s ease-in-out infinite;
+}
+
+.graduate-photo-carousel .graduate-photo-track::before {
+  content: "A+";
+  position: absolute;
+  right: 14px;
+  top: 12px;
+  z-index: 5;
+  color: rgb(214 32 24 / 78%);
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 1rem;
+  font-weight: 900;
+  transform: rotate(-14deg);
+  text-shadow: 0 6px 12px rgb(118 36 30 / 18%);
+  animation: showcaseBadgeFloat 2.4s ease-in-out infinite alternate;
+  pointer-events: none;
 }
 
 .graduate-photo-progress {
@@ -347,22 +364,27 @@ a {
   opacity: 1;
   filter: saturate(1.03);
   transform: translateX(0) scale(1);
+  animation: photoTileFloat 4.4s ease-in-out infinite alternate;
 }
 
 .graduate-photo-slide.active img:nth-child(1) {
   transition-delay: 0ms;
+  animation-delay: -0.4s;
 }
 
 .graduate-photo-slide.active img:nth-child(2) {
   transition-delay: 80ms;
+  animation-delay: -1.2s;
 }
 
 .graduate-photo-slide.active img:nth-child(3) {
   transition-delay: 150ms;
+  animation-delay: -2s;
 }
 
 .graduate-photo-slide.active img:nth-child(4) {
   transition-delay: 220ms;
+  animation-delay: -2.8s;
 }
 
 .graduate-photo-empty {
@@ -390,15 +412,28 @@ a {
   box-shadow:
     0 18px 36px rgb(70 45 28 / 14%),
     inset 0 0 0 5px rgb(255 255 255 / 58%);
+  isolation: isolate;
 }
 
 .sash-card::before {
   content: "";
   position: absolute;
   inset: 8px;
+  z-index: 2;
   border: 1px solid rgb(135 95 42 / 16%);
   border-radius: 7px;
   pointer-events: none;
+}
+
+.sash-card::after {
+  content: "";
+  position: absolute;
+  inset: -40% -70%;
+  z-index: 3;
+  pointer-events: none;
+  background: linear-gradient(110deg, transparent 42%, rgb(255 255 255 / 48%) 50%, transparent 58%);
+  transform: translateX(-60%) rotate(10deg);
+  animation: sashShine 4.2s ease-in-out infinite;
 }
 
 .sash-card img {
@@ -523,8 +558,10 @@ a {
 }
 
 .calendar-day.event-day {
-  color: #313131;
+  z-index: 1;
+  color: #7f2630;
   font-weight: 900;
+  animation: eventDateTextPulse 1.9s ease-in-out infinite;
 }
 
 .calendar-day.event-day::before {
@@ -538,6 +575,22 @@ a {
   line-height: 1;
   transform: translate(-50%, -50%) rotate(-8deg);
   filter: drop-shadow(0 4px 5px rgb(72 52 28 / 12%));
+  animation: eventStarPulse 1.9s ease-in-out infinite;
+}
+
+.calendar-day.event-day::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  z-index: -1;
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle, rgb(255 224 133 / 42%) 0%, rgb(255 224 133 / 18%) 42%, transparent 70%);
+  transform: translate(-50%, -50%);
+  animation: eventDateGlow 1.9s ease-in-out infinite;
 }
 
 .calendar-sparkle {
@@ -575,6 +628,52 @@ a {
   }
 }
 
+@keyframes showcaseBadgeFloat {
+  from {
+    opacity: 0.55;
+    transform: translateY(2px) rotate(-14deg) scale(0.96);
+  }
+
+  to {
+    opacity: 0.95;
+    transform: translateY(-4px) rotate(-8deg) scale(1.05);
+  }
+}
+
+@keyframes photoTileFloat {
+  from {
+    box-shadow:
+      0 10px 18px rgb(48 31 18 / 14%),
+      inset 0 0 0 1px rgb(130 90 45 / 12%);
+    transform: translateY(0) scale(1);
+  }
+
+  to {
+    box-shadow:
+      0 15px 24px rgb(48 31 18 / 20%),
+      inset 0 0 0 1px rgb(130 90 45 / 16%);
+    transform: translateY(-3px) scale(1.015);
+  }
+}
+
+@keyframes sashShine {
+  0%,
+  46% {
+    opacity: 0;
+    transform: translateX(-60%) rotate(10deg);
+  }
+
+  58% {
+    opacity: 1;
+  }
+
+  78%,
+  100% {
+    opacity: 0;
+    transform: translateX(60%) rotate(10deg);
+  }
+}
+
 @keyframes photoProgress {
   from {
     transform: scaleX(0);
@@ -594,6 +693,47 @@ a {
   to {
     opacity: 0.78;
     transform: translateY(-4px) rotate(8deg) scale(1.06);
+  }
+}
+
+@keyframes eventStarPulse {
+  0%,
+  100% {
+    opacity: 0.58;
+    transform: translate(-50%, -50%) rotate(-8deg) scale(0.92);
+    filter: drop-shadow(0 3px 4px rgb(72 52 28 / 10%));
+  }
+
+  50% {
+    opacity: 1;
+    transform: translate(-50%, -50%) rotate(-8deg) scale(1.08);
+    filter: drop-shadow(0 7px 10px rgb(127 38 48 / 22%));
+  }
+}
+
+@keyframes eventDateTextPulse {
+  0%,
+  100% {
+    color: #343331;
+    transform: scale(1);
+  }
+
+  50% {
+    color: #8b2631;
+    transform: scale(1.12);
+  }
+}
+
+@keyframes eventDateGlow {
+  0%,
+  100% {
+    opacity: 0.18;
+    transform: translate(-50%, -50%) scale(0.86);
+  }
+
+  50% {
+    opacity: 0.8;
+    transform: translate(-50%, -50%) scale(1.18);
   }
 }
 
@@ -1046,7 +1186,7 @@ a {
   left: 50%;
   bottom: max(12px, env(safe-area-inset-bottom));
   z-index: 46;
-  width: min(calc(100% - 36px), 390px);
+  width: min(calc(100% - 92px), 390px);
   margin: 0;
   display: grid;
   gap: 6px;
@@ -1097,7 +1237,7 @@ a {
   font-size: 0.74rem;
 }
 
-.wish-composer button {
+.wish-composer form button {
   min-height: 30px;
   border: 0;
   border-radius: 999px;
@@ -1113,12 +1253,12 @@ a {
   white-space: nowrap;
 }
 
-.wish-composer button svg {
+.wish-composer form button svg {
   width: 15px;
   height: 15px;
 }
 
-.wish-composer button:disabled {
+.wish-composer form button:disabled {
   opacity: 0.54;
   cursor: not-allowed;
 }
@@ -1147,6 +1287,64 @@ a {
 .wish-composer.has-success .wish-status {
   color: #2e5961;
   border: 1px solid rgb(84 149 139 / 18%);
+}
+
+.music-float-button {
+  position: fixed;
+  left: max(18px, calc((100vw - 480px) / 2 + 18px));
+  bottom: max(14px, env(safe-area-inset-bottom));
+  z-index: 47;
+  width: 42px;
+  height: 42px;
+  display: grid;
+  place-items: center;
+  border: 1px solid rgb(212 183 134 / 62%);
+  border-radius: 50%;
+  color: #9a681b;
+  background: rgb(255 252 245 / 94%);
+  box-shadow: 0 12px 28px rgb(70 45 28 / 18%);
+  backdrop-filter: blur(14px);
+  transition:
+    transform 180ms ease,
+    color 180ms ease,
+    background 180ms ease,
+    box-shadow 180ms ease;
+}
+
+.music-float-button svg {
+  position: relative;
+  z-index: 1;
+}
+
+.music-float-button.playing svg {
+  animation: musicSpin 2.8s linear infinite;
+}
+
+.music-float-button span {
+  position: absolute;
+  width: 28px;
+  height: 2px;
+  border-radius: 999px;
+  background: #9b3428;
+  transform: rotate(-42deg);
+}
+
+.music-float-button:active {
+  transform: scale(0.94);
+}
+
+.music-float-button.playing {
+  color: #fff;
+  background: linear-gradient(135deg, #c28b13, #9a681b);
+  box-shadow:
+    0 14px 30px rgb(117 75 12 / 24%),
+    0 0 0 5px rgb(194 139 19 / 12%);
+}
+
+@keyframes musicSpin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 @keyframes wishStatusFade {
@@ -1562,6 +1760,34 @@ a {
 .details {
   display: grid;
   gap: 8px;
+}
+
+.closing-note {
+  margin: 18px 18px 0;
+  padding: 18px 16px;
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+  border: 1px solid rgb(218 196 160 / 68%);
+  border-radius: 8px;
+  color: #4a392b;
+  background:
+    linear-gradient(135deg, rgb(255 255 255 / 76%), rgb(255 245 224 / 76%)),
+    #fff8ec;
+  box-shadow: 0 14px 28px rgb(70 45 28 / 9%);
+  text-align: center;
+}
+
+.closing-note svg {
+  color: #bd8a35;
+}
+
+.closing-note p {
+  margin: 0;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: clamp(1.08rem, 4.8vw, 1.35rem);
+  font-weight: 800;
+  line-height: 1.35;
 }
 
 .action-bar {
@@ -3757,21 +3983,27 @@ a {
 
   .wish-composer {
     bottom: 10px;
-    width: min(calc(100% - 24px), 390px);
+    left: 62px;
+    width: 42px;
+  }
+
+  .wish-composer.open {
+    width: min(calc(100vw - 24px), 390px);
   }
 
   .wish-composer form {
+    width: min(calc(100vw - 24px), 390px);
     grid-template-columns: 17px minmax(0, 1fr) 34px;
     min-height: 38px;
     padding-left: 10px;
   }
 
-  .wish-composer button {
+  .wish-composer form button {
     width: 34px;
     padding: 0;
   }
 
-  .wish-composer button span {
+  .wish-composer form button span {
     display: none;
   }
 

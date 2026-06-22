@@ -36,16 +36,22 @@ const defaultNotes = [
 
 const defaultMemories = [
   {
-    title: "Danh hiệu",
-    description: "Sinh viên hoàn thành chương trình học với nhiều nỗ lực đáng nhớ."
+    date: "",
+    image: "",
+    title: "Ngày đầu tiên lạc lối",
+    description: "Bước chân vào cánh cổng đại học, vừa hồi hộp vừa choáng ngợp."
   },
   {
-    title: "Hoạt động",
-    description: "Tham gia câu lạc bộ, workshop và các dự án trong thời gian học."
+    date: "",
+    image: "",
+    title: "Những ngày thật chăm chỉ",
+    description: "Từng bài học, từng dự án và từng lần cố gắng đã tạo nên hành trình đáng nhớ."
   },
   {
-    title: "Ngoại khóa",
-    description: "Những chuyến đi, sự kiện và khoảnh khắc cùng bạn bè."
+    date: "",
+    image: "",
+    title: "Khoảnh khắc tốt nghiệp",
+    description: "Một dấu mốc khép lại thanh xuân rực rỡ và mở ra chặng đường mới."
   }
 ];
 
@@ -127,7 +133,7 @@ function normalizeConfig(data) {
     memories:
       Array.isArray(data?.memories)
         ? data.memories.map((item) =>
-            typeof item === "string" ? { title: item, description: "" } : { title: "", description: "", ...item }
+            typeof item === "string" ? { date: "", image: "", title: item, description: "" } : { date: "", image: "", title: "", description: "", ...item }
           )
         : defaultMemories
   };
@@ -1188,6 +1194,47 @@ function MapSection({ config }) {
   );
 }
 
+function TimelineSection({ items = [], config }) {
+  const fallbackPhotos = useMemo(() => {
+    const merged = [
+      ...(config.gallery || []),
+      ...(config.heroImages || []),
+      config.heroImage
+    ].filter(Boolean);
+    return [...new Set(merged)];
+  }, [config.gallery, config.heroImage, config.heroImages]);
+
+  const timelineItems = (items || []).filter((item) => item?.title || item?.description || item?.image || item?.date);
+  if (!timelineItems.length) return null;
+
+  return (
+    <section className="timeline-section" data-reveal>
+      <h2>Dòng thời gian</h2>
+      <div className="timeline-list">
+        {timelineItems.map((item, index) => {
+          const image = item.image || fallbackPhotos[index % Math.max(fallbackPhotos.length, 1)] || "";
+          const date = item.date ? formatDate(item.date).replace(/^\S+,\s*/u, "") : "";
+
+          return (
+            <article className="timeline-card" key={`${item.title || item.description}-${index}`}>
+              {image && (
+                <div className="timeline-photo">
+                  <img src={resolveAsset(image)} alt={item.title || `Dòng thời gian ${index + 1}`} />
+                </div>
+              )}
+              {date && <span className="timeline-date">{date}</span>}
+              <div className="timeline-copy">
+                {item.title && <h3>{item.title}</h3>}
+                {item.description && <p>{item.description}</p>}
+              </div>
+            </article>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
 function Invitation({ config, isOpened }) {
   const countdown = useCountdown(config);
   const { guest, checked, token } = useGuestToken();
@@ -1251,23 +1298,7 @@ function Invitation({ config, isOpened }) {
           </section>
         )}
 
-        <section className="content-section memory-section" data-reveal>
-          <div className="section-heading">
-            <Medal size={22} />
-            <h2>Kỷ niệm đáng nhớ</h2>
-          </div>
-          <div className="memory-list">
-            {(config.memories || []).map((item, index) => (
-              <article key={`${item.title}-${index}`}>
-                <Award size={20} />
-                <div>
-                  <h3>{item.title}</h3>
-                  <p>{item.description}</p>
-                </div>
-              </article>
-            ))}
-          </div>
-        </section>
+        <TimelineSection items={config.memories || []} config={config} />
 
         <section className="content-section note-section" data-reveal>
           <div className="section-heading">
@@ -1286,13 +1317,12 @@ function Invitation({ config, isOpened }) {
           <p>Trân trọng, {config.hostName}</p>
         </section>
 
+        <section className="closing-note" data-reveal>
+          <Sparkles size={18} aria-hidden="true" />
+          <p>Hẹn mọi người tại buổi lễ nhé</p>
+        </section>
+
         <div className="action-bar">
-          {config.mapUrl && (
-            <a href={config.mapUrl} target="_blank" rel="noreferrer">
-              <MapPin size={18} />
-              Chỉ đường
-            </a>
-          )}
           {config.rsvpUrl && (
             <a href={config.rsvpUrl} target="_blank" rel="noreferrer">
               <Check size={18} />
@@ -2503,15 +2533,35 @@ function App() {
   const { guest, checked: guestChecked } = useGuestToken();
   const isAdmin = window.location.pathname.startsWith("/admin");
   const [isOpened, setIsOpened] = useState(false);
+  const [musicEnabled, setMusicEnabled] = useState(true);
+  const [musicPlaying, setMusicPlaying] = useState(false);
   const audioRef = useRef(null);
 
   const playMusic = useCallback(() => {
     const audio = audioRef.current;
-    if (!audio || !config.musicUrl) return;
+    if (!audio || !config.musicUrl || !musicEnabled) return;
     audio.volume = typeof config.musicVolume === "number" ? config.musicVolume : 0.6;
     audio.muted = false;
-    audio.play().catch(() => {});
-  }, [config.musicUrl, config.musicVolume]);
+    audio.play().then(() => setMusicPlaying(true)).catch(() => setMusicPlaying(false));
+  }, [config.musicUrl, config.musicVolume, musicEnabled]);
+
+  const toggleMusic = useCallback(() => {
+    const audio = audioRef.current;
+    if (!audio || !config.musicUrl) return;
+
+    if (musicEnabled) {
+      setMusicEnabled(false);
+      audio.pause();
+      audio.muted = true;
+      setMusicPlaying(false);
+      return;
+    }
+
+    setMusicEnabled(true);
+    audio.volume = typeof config.musicVolume === "number" ? config.musicVolume : 0.6;
+    audio.muted = false;
+    audio.play().then(() => setMusicPlaying(true)).catch(() => setMusicPlaying(false));
+  }, [config.musicUrl, config.musicVolume, musicEnabled]);
 
   const handleInvitationOpen = useCallback(() => {
     setIsOpened(true);
@@ -2523,10 +2573,12 @@ function App() {
     if (!audio) return;
     audio.pause();
     audio.load();
+    setMusicEnabled(true);
+    setMusicPlaying(false);
   }, [config.musicUrl]);
 
   useEffect(() => {
-    if (!config.musicUrl || isAdmin) return undefined;
+    if (!config.musicUrl || isAdmin || !musicEnabled) return undefined;
 
     const audio = audioRef.current;
     const timers = [0, 250, 900, 1800].map((delay) => window.setTimeout(playMusic, delay));
@@ -2554,7 +2606,7 @@ function App() {
       audio?.removeEventListener("canplay", playMusic);
       audio?.removeEventListener("loadeddata", playMusic);
     };
-  }, [config.musicUrl, isAdmin, playMusic]);
+  }, [config.musicUrl, isAdmin, musicEnabled, playMusic]);
 
   const page = useMemo(() => {
     if (loading || !guestChecked) return <div className="loading">Đang tải...</div>;
@@ -2583,7 +2635,21 @@ function App() {
           loop
           onCanPlay={playMusic}
           onLoadedData={playMusic}
+          onPlay={() => setMusicPlaying(true)}
+          onPause={() => setMusicPlaying(false)}
         />
+      )}
+      {config.musicUrl && !isAdmin && isOpened && (
+        <button
+          type="button"
+          className={`music-float-button${musicEnabled && musicPlaying ? " playing" : ""}`}
+          onClick={toggleMusic}
+          aria-label={musicEnabled ? "Tắt nhạc" : "Bật nhạc"}
+          title={musicEnabled ? "Tắt nhạc" : "Bật nhạc"}
+        >
+          <Music size={19} />
+          {!musicEnabled && <span aria-hidden="true" />}
+        </button>
       )}
       {page}
     </>
