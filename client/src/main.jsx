@@ -53,9 +53,12 @@ const emptyConfig = {
   heroImage: "",
   heroImages: [],
   gallery: [],
+  schoolLogo: "",
+  sashImage: "",
   graduateName: "",
   degree: "",
   school: "",
+  schoolSubtitle: "",
   eventTitle: "Lễ tốt nghiệp",
   eventDate: "",
   eventTime: "",
@@ -86,6 +89,7 @@ const fields = [
   ["graduateName", "Tên người tốt nghiệp"],
   ["degree", "Danh xưng / ngành học"],
   ["school", "Trường"],
+  ["schoolSubtitle", "Tên trường phụ / tiếng Anh"],
   ["eventTitle", "Tên sự kiện"],
   ["eventDate", "Ngày tổ chức", "date"],
   ["eventTime", "Giờ bắt đầu", "time"],
@@ -183,6 +187,11 @@ function formatEventTime(config) {
     return `${config.eventTime} - ${config.eventEndTime}`;
   }
   return config.eventTime || config.eventEndTime;
+}
+
+function getEventYear(config) {
+  const eventDate = getEventDateTime(config);
+  return eventDate?.getFullYear() || new Date().getFullYear();
 }
 
 function applyGreetingTemplate(template, guest) {
@@ -930,145 +939,225 @@ function WishComposer({ guest, token, recipientName, onSend }) {
   );
 }
 
+function InvitationCardHero({ config, guest }) {
+  const ceremonyYear = getEventYear(config);
+  const recipientName = guest ? [guest.relation, guest.name].filter(Boolean).join(" ") : "thân mến";
+  const relation = guest?.relation ? `${guest.relation} ` : "";
+  const schoolName = config.school || "Trường Đại học";
+  const schoolSubtitle = config.schoolSubtitle || "Graduation Ceremony";
+  const graduateName = config.graduateName || "Lễ Tốt Nghiệp";
+
+  return (
+    <section className="ceremony-card-hero" aria-label="Thiệp mời tốt nghiệp">
+      <FallingGraduationIcons />
+      <div className="ceremony-card">
+        <div className="school-brand">
+          <div className="school-logo">
+            {config.schoolLogo ? (
+              <img src={resolveAsset(config.schoolLogo)} alt={`Logo ${schoolName}`} />
+            ) : (
+              <GraduationCap size={34} />
+            )}
+          </div>
+          <div>
+            <strong>{schoolName}</strong>
+            <span>{schoolSubtitle}</span>
+          </div>
+        </div>
+
+        <div className="dear-line">
+          <span>Dear</span>
+          <strong>{recipientName}</strong>
+        </div>
+
+        <p className="ceremony-invite">
+          Thân mời {relation}đến dự
+        </p>
+        <p className="ceremony-owner">{graduateName}'s</p>
+        <h1>
+          Graduation
+          <span>Ceremony {ceremonyYear}</span>
+        </h1>
+      </div>
+    </section>
+  );
+}
+
+function getRollingPhotoFrames(photos, frameSize = 4) {
+  if (!photos.length) return [];
+  return photos.map((_, startIndex) =>
+    Array.from({ length: Math.min(frameSize, photos.length) }, (_item, offset) => photos[(startIndex + offset) % photos.length])
+  );
+}
+
+function GraduateShowcase({ config }) {
+  const [activeIndex, setActiveIndex] = useState(0);
+  const photos = useMemo(() => {
+    const merged = [...(config.heroImages || []), config.heroImage].filter(Boolean);
+    return [...new Set(merged)];
+  }, [config.heroImage, config.heroImages]);
+  const frames = useMemo(() => getRollingPhotoFrames(photos), [photos]);
+  const hasManyFrames = frames.length > 1;
+
+  useEffect(() => {
+    if (!hasManyFrames) return undefined;
+    const timer = window.setInterval(() => {
+      setActiveIndex((current) => (current + 1) % frames.length);
+    }, 3600);
+    return () => window.clearInterval(timer);
+  }, [frames.length, hasManyFrames]);
+
+  useEffect(() => {
+    setActiveIndex(0);
+  }, [frames.length]);
+
+  return (
+    <section className="graduate-showcase" data-reveal aria-label="Ảnh người tốt nghiệp và sash">
+      <div className="graduate-photo-carousel">
+        {frames.length ? (
+          <div className="graduate-photo-track" style={{ transform: `translateX(-${activeIndex * 100}%)` }}>
+            {frames.map((framePhotos, frameIndex) => (
+              <div className="graduate-photo-slide" key={`${framePhotos.join("-")}-${frameIndex}`}>
+                {framePhotos.map((photo, photoIndex) => (
+                  <img
+                    key={`${photo}-${photoIndex}`}
+                    src={resolveAsset(photo)}
+                    alt={`${config.graduateName || "Người tốt nghiệp"} ${photoIndex + 1}`}
+                  />
+                ))}
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="graduate-photo-empty">
+            <GraduationCap size={32} />
+          </div>
+        )}
+      </div>
+
+      <aside className="sash-card">
+        {config.sashImage ? (
+          <img src={resolveAsset(config.sashImage)} alt="Sash tốt nghiệp" />
+        ) : (
+          <div className="sash-empty">
+            <Medal size={28} />
+            <span>Sash</span>
+          </div>
+        )}
+      </aside>
+    </section>
+  );
+}
+
 function Invitation({ config, isOpened }) {
   const countdown = useCountdown(config);
   const { guest, checked, token } = useGuestToken();
   const { wishes, sendWish } = useWishes(isOpened && checked);
   useScrollReveal();
 
-  const photos = useMemo(() => {
-    const merged = [...(config.heroImages || []), config.heroImage].filter(Boolean);
-    return [...new Set(merged)];
-  }, [config.heroImage, config.heroImages]);
-
   if (!checked) return null;
 
   return (
     <>
       <main className={`invitation-shell${isOpened ? " card-revealed" : ""}`}>
-        <section className="hero">
-          <FallingGraduationIcons />
-          <PhotoCarousel photos={photos} graduateName={config.graduateName} />
-          <div className="hero-copy">
-            <p className="eyebrow">Thư mời dự tốt nghiệp</p>
-            <h1>{config.graduateName}</h1>
-            <p>{config.degree}</p>
-            <span>{config.school}</span>
-          </div>
+        <InvitationCardHero config={config} guest={guest} />
+        <GraduateShowcase config={config} />
+
+        <section className="content-section intro" data-reveal>
+          <Sparkles size={22} />
+          <p>{config.greeting}</p>
+          <strong>{config.message}</strong>
+          {config.description && <span>{config.description}</span>}
         </section>
 
-        {/* Banner cá nhân hóa – CHỈ hiển thị khi có khách hợp lệ */}
-        {guest && (
-          <section className="content-section guest-banner" data-reveal>
-            <div className="guest-banner-inner">
-              {guest.avatar ? (
-                <img src={resolveAsset(guest.avatar)} alt={guest.name} className="guest-banner-avatar" />
-              ) : (
-                <Heart size={20} className="guest-banner-icon" />
-              )}
-              <p>
-                Kính mời <span className="guest-relation">{guest.relation}</span>{" "}
-                <strong className="guest-name">{guest.name}</strong>
-              </p>
+        {(guest?.privateMessage || config.privateMessage) && (
+          <section className="content-section private-message" data-reveal>
+            <Heart size={22} />
+            <div>
+              <p className="eyebrow">Lời nhắn gửi riêng</p>
+              <strong>{guest?.privateMessage || config.privateMessage}</strong>
             </div>
           </section>
         )}
 
-      <section className="content-section intro" data-reveal>
-        <Sparkles size={22} />
-        <p>{config.greeting}</p>
-        <strong>{config.message}</strong>
-        {config.description && <span>{config.description}</span>}
-      </section>
-
-      {(guest?.privateMessage || config.privateMessage) && (
-        <section className="content-section private-message" data-reveal>
-          <Heart size={22} />
+        <section className="countdown-section" data-reveal>
           <div>
-            <p className="eyebrow">Lời nhắn gửi riêng</p>
-            <strong>{guest?.privateMessage || config.privateMessage}</strong>
+            <p className="eyebrow">{config.eventTitle}</p>
+            <h2>{countdown.expired ? "Hẹn gặp tại buổi lễ" : "Đếm ngược đến ngày vui"}</h2>
+          </div>
+          <div className="countdown-grid">
+            {countdown.items.map(([label, value]) => (
+              <article key={label}>
+                <FlipDigit value={value} />
+                <span>{label}</span>
+              </article>
+            ))}
           </div>
         </section>
-      )}
 
-      <section className="countdown-section" data-reveal>
-        <div>
-          <p className="eyebrow">{config.eventTitle}</p>
-          <h2>{countdown.expired ? "Hẹn gặp tại buổi lễ" : "Đếm ngược đến ngày vui"}</h2>
-        </div>
-        <div className="countdown-grid">
-          {countdown.items.map(([label, value]) => (
-            <article key={label}>
-              <FlipDigit value={value} />
-              <span>{label}</span>
-            </article>
-          ))}
-        </div>
-      </section>
-
-      <section className="content-section event-grid" data-reveal>
-        <Info icon={<CalendarDays />} label="Ngày" value={formatDate(config.eventDate)} />
-        <Info icon={<Clock />} label="Thời gian" value={formatEventTime(config)} />
-        <Info icon={<MapPin />} label={config.locationName} value={config.locationAddress} />
-      </section>
-
-      {(config.gallery || []).length > 0 && (
-        <section className="memory-gallery" data-reveal>
-          {(config.gallery || []).slice(0, 5).map((image, index) => (
-            <img key={image} src={resolveAsset(image)} alt={`Khoảnh khắc ${index + 1}`} />
-          ))}
+        <section className="content-section event-grid" data-reveal>
+          <Info icon={<CalendarDays />} label="Ngày" value={formatDate(config.eventDate)} />
+          <Info icon={<Clock />} label="Thời gian" value={formatEventTime(config)} />
+          <Info icon={<MapPin />} label={config.locationName} value={config.locationAddress} />
         </section>
-      )}
 
-      <section className="content-section memory-section" data-reveal>
-        <div className="section-heading">
-          <Medal size={22} />
-          <h2>Kỷ niệm đáng nhớ</h2>
-        </div>
-        <div className="memory-list">
-          {(config.memories || []).map((item, index) => (
-            <article key={`${item.title}-${index}`}>
-              <Award size={20} />
-              <div>
-                <h3>{item.title}</h3>
-                <p>{item.description}</p>
-              </div>
-            </article>
-          ))}
-        </div>
-      </section>
-
-      <section className="content-section note-section" data-reveal>
-        <div className="section-heading">
-          <Check size={22} />
-          <h2>Lưu ý</h2>
-        </div>
-        <ul>
-          {(config.notes || []).map((note, index) => (
-            <li key={`${note}-${index}`}>{note}</li>
-          ))}
-        </ul>
-      </section>
-
-      <section className="content-section details" data-reveal>
-        <p>Dress code: {config.dressCode}</p>
-        <p>Trân trọng, {config.hostName}</p>
-      </section>
-
-      <div className="action-bar">
-        {config.mapUrl && (
-          <a href={config.mapUrl} target="_blank" rel="noreferrer">
-            <MapPin size={18} />
-            Chỉ đường
-          </a>
+        {(config.gallery || []).length > 0 && (
+          <section className="memory-gallery" data-reveal>
+            {(config.gallery || []).slice(0, 5).map((image, index) => (
+              <img key={image} src={resolveAsset(image)} alt={`Khoảnh khắc ${index + 1}`} />
+            ))}
+          </section>
         )}
-        {config.rsvpUrl && (
-          <a href={config.rsvpUrl} target="_blank" rel="noreferrer">
-            <Check size={18} />
-            Xác nhận
-          </a>
-        )}
-      </div>
+
+        <section className="content-section memory-section" data-reveal>
+          <div className="section-heading">
+            <Medal size={22} />
+            <h2>Kỷ niệm đáng nhớ</h2>
+          </div>
+          <div className="memory-list">
+            {(config.memories || []).map((item, index) => (
+              <article key={`${item.title}-${index}`}>
+                <Award size={20} />
+                <div>
+                  <h3>{item.title}</h3>
+                  <p>{item.description}</p>
+                </div>
+              </article>
+            ))}
+          </div>
+        </section>
+
+        <section className="content-section note-section" data-reveal>
+          <div className="section-heading">
+            <Check size={22} />
+            <h2>Lưu ý</h2>
+          </div>
+          <ul>
+            {(config.notes || []).map((note, index) => (
+              <li key={`${note}-${index}`}>{note}</li>
+            ))}
+          </ul>
+        </section>
+
+        <section className="content-section details" data-reveal>
+          <p>Dress code: {config.dressCode}</p>
+          <p>Trân trọng, {config.hostName}</p>
+        </section>
+
+        <div className="action-bar">
+          {config.mapUrl && (
+            <a href={config.mapUrl} target="_blank" rel="noreferrer">
+              <MapPin size={18} />
+              Chỉ đường
+            </a>
+          )}
+          {config.rsvpUrl && (
+            <a href={config.rsvpUrl} target="_blank" rel="noreferrer">
+              <Check size={18} />
+              Xác nhận
+            </a>
+          )}
+        </div>
       </main>
 
       <WishBubbles wishes={wishes} />
@@ -1270,6 +1359,10 @@ function Admin({ config, setConfig }) {
       if (target === "heroImages") {
         updateField("heroImages", [...new Set([...(config.heroImages || []), ...urls])]);
         if (!config.heroImage && urls[0]) updateField("heroImage", urls[0]);
+      } else if (target === "schoolLogo") {
+        updateField("schoolLogo", urls[0] || "");
+      } else if (target === "sashImage") {
+        updateField("sashImage", urls[0] || "");
       } else if (target === "introGreetingImage") {
         updateField("introGreetingImage", urls[0] || "");
       } else {
@@ -1519,6 +1612,72 @@ function Admin({ config, setConfig }) {
                   </button>
                 </div>
               ))}
+            </div>
+          </section>
+
+          <section className="admin-panel school-logo-panel">
+            <PanelTitle icon={<Medal size={20} />} title="Logo trường" />
+            <div className="school-logo-editor">
+              {config.schoolLogo ? (
+                <div className="school-logo-preview-admin">
+                  <img src={resolveAsset(config.schoolLogo)} alt="Logo trường" />
+                  <button
+                    type="button"
+                    className="delete-image-button"
+                    onClick={() => updateField("schoolLogo", "")}
+                    title="Xóa logo trường"
+                  >
+                    <Trash2 size={16} />
+                  </button>
+                </div>
+              ) : (
+                <div className="school-logo-empty">
+                  <GraduationCap size={26} />
+                  <span>Chưa có logo trường</span>
+                </div>
+              )}
+              <label className="inline-upload">
+                <ImagePlus size={18} />
+                {config.schoolLogo ? "Thay logo" : "Thêm logo"}
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) => uploadImages(e.target.files, "schoolLogo")}
+                />
+              </label>
+            </div>
+          </section>
+
+          <section className="admin-panel sash-image-panel">
+            <PanelTitle icon={<Medal size={20} />} title="Ảnh sash" />
+            <div className="sash-image-editor">
+              {config.sashImage ? (
+                <div className="sash-image-preview-admin">
+                  <img src={resolveAsset(config.sashImage)} alt="Ảnh sash" />
+                  <button
+                    type="button"
+                    className="delete-image-button"
+                    onClick={() => updateField("sashImage", "")}
+                    title="Xóa ảnh sash"
+                  >
+                    <Trash2 size={16} />
+                  </button>
+                </div>
+              ) : (
+                <div className="sash-image-empty">
+                  <Medal size={26} />
+                  <span>Chưa có ảnh sash</span>
+                </div>
+              )}
+              <label className="inline-upload">
+                <ImagePlus size={18} />
+                {config.sashImage ? "Thay sash" : "Thêm sash"}
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) => uploadImages(e.target.files, "sashImage")}
+                />
+              </label>
             </div>
           </section>
 
