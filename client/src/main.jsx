@@ -578,7 +578,7 @@ function Invitation({ config, isOpened }) {
         <PhotoCarousel photos={photos} graduateName={config.graduateName} />
         <div className="hero-copy">
           <p className="eyebrow">Thư mời dự tốt nghiệp</p>
-          <h2>{config.graduateName}</h2>
+          <h1>{config.graduateName}</h1>
           <p>{config.degree}</p>
           <span>{config.school}</span>
         </div>
