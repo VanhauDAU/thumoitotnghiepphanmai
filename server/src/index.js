@@ -20,6 +20,7 @@ const adminToken = process.env.ADMIN_TOKEN || "";
 const defaultConfig = {
   heroImage: "",
   heroImages: [],
+  heroImageCrops: {},
   gallery: [],
   graduateName: "Nguyen Van A",
   degree: "Tan cu nhan Cong nghe thong tin",
@@ -31,6 +32,7 @@ const defaultConfig = {
   locationAddress: "123 Duong Le Loi, Quan 1, TP. Ho Chi Minh",
   mapUrl: "",
   hostName: "Gia dinh Nguyen",
+  showIntroSection: true,
   greeting: "Tran trong kinh moi ban den chung vui trong ngay le tot nghiep.",
   message:
     "Su hien dien cua ban la niem vui va niem vinh hanh lon voi minh va gia dinh.",
@@ -38,7 +40,7 @@ const defaultConfig = {
     "Cam on ban da la mot phan dac biet trong hanh trinh thanh xuan nay.",
   description:
     "Day la cot moc danh dau hanh trinh hoc tap va nhung ky niem dang nho.",
-  dressCode: "Lich su, trang nhã",
+  thankYouMessage: "Cam on ban da dong hanh cung minh.",
   phone: "0900000000",
   rsvpUrl: "",
   backgroundMusic: "",

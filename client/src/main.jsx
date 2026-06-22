@@ -47,6 +47,7 @@ const defaultMemories = [
 const emptyConfig = {
   heroImage: "",
   heroImages: [],
+  heroImageCrops: {},
   gallery: [],
   graduateName: "",
   degree: "",
@@ -61,11 +62,12 @@ const emptyConfig = {
   hostName: "",
   introGreetingImage: "",
   introGreetingTemplate: "Chào {quan hệ} {người được mời}, mình gửi bạn một chiếc thiệp nhỏ cho ngày tốt nghiệp thật đặc biệt này.",
+  showIntroSection: true,
   greeting: "",
   message: "",
   privateMessage: "",
   description: "",
-  dressCode: "",
+  thankYouMessage: "",
   phone: "",
   rsvpUrl: "",
   backgroundMusic: "",
@@ -90,7 +92,7 @@ const fields = [
   ["message", "Lời nhắn chính"],
   ["privateMessage", "Lời nhắn gửi riêng"],
   ["description", "Mô tả thêm"],
-  ["dressCode", "Dress code"],
+  ["thankYouMessage", "Lời cảm ơn"],
   ["rsvpUrl", "Link xác nhận tham dự"]
 ];
 
@@ -102,11 +104,16 @@ const RELATION_OPTIONS = [
 function normalizeConfig(data) {
   const heroImages = Array.isArray(data?.heroImages) ? data.heroImages : [];
   const legacyHeroImage = data?.heroImage ? [data.heroImage] : [];
+  const heroImageCrops =
+    data?.heroImageCrops && typeof data.heroImageCrops === "object" && !Array.isArray(data.heroImageCrops)
+      ? data.heroImageCrops
+      : {};
 
   return {
     ...emptyConfig,
     ...data,
     heroImages: [...new Set([...heroImages, ...legacyHeroImage])],
+    heroImageCrops,
     gallery: Array.isArray(data?.gallery) ? data.gallery : [],
     notes: Array.isArray(data?.notes) ? data.notes : defaultNotes,
     memories:
@@ -418,20 +425,20 @@ function playDefaultOpeningSound() {
   const now = context.currentTime;
   const master = context.createGain();
   master.gain.setValueAtTime(0.001, now);
-  master.gain.exponentialRampToValueAtTime(0.22, now + 0.025);
-  master.gain.exponentialRampToValueAtTime(0.001, now + 1.35);
+  master.gain.exponentialRampToValueAtTime(0.42, now + 0.02);
+  master.gain.exponentialRampToValueAtTime(0.001, now + 1.65);
   master.connect(context.destination);
 
-  const playTone = ({ frequency, start, duration, peak = 0.28, type = "sine", detune = 0 }) => {
+  const playTone = ({ frequency, start, duration, peak = 0.28, type = "sine", detune = 0, sweep = 1.01 }) => {
     const oscillator = context.createOscillator();
     const gain = context.createGain();
 
     oscillator.type = type;
     oscillator.frequency.setValueAtTime(frequency, start);
     oscillator.detune.setValueAtTime(detune, start);
-    oscillator.frequency.exponentialRampToValueAtTime(frequency * 1.012, start + duration * 0.72);
+    oscillator.frequency.exponentialRampToValueAtTime(frequency * sweep, start + duration * 0.76);
     gain.gain.setValueAtTime(0.001, start);
-    gain.gain.exponentialRampToValueAtTime(peak, start + 0.018);
+    gain.gain.exponentialRampToValueAtTime(peak, start + 0.014);
     gain.gain.exponentialRampToValueAtTime(0.001, start + duration);
 
     oscillator.connect(gain);
@@ -440,45 +447,64 @@ function playDefaultOpeningSound() {
     oscillator.stop(start + duration + 0.04);
   };
 
-  [
-    { frequency: 523.25, start: now, duration: 0.34, peak: 0.2, type: "triangle" },
-    { frequency: 783.99, start: now + 0.055, duration: 0.46, peak: 0.26 },
-    { frequency: 1046.5, start: now + 0.12, duration: 0.62, peak: 0.22 },
-    { frequency: 1567.98, start: now + 0.24, duration: 0.74, peak: 0.12 },
-    { frequency: 2093, start: now + 0.34, duration: 0.58, peak: 0.08, detune: 7 }
-  ].forEach(playTone);
-
-  const noiseBuffer = context.createBuffer(1, context.sampleRate * 0.28, context.sampleRate);
+  const noiseBuffer = context.createBuffer(1, context.sampleRate * 0.44, context.sampleRate);
   const noiseData = noiseBuffer.getChannelData(0);
   for (let i = 0; i < noiseData.length; i += 1) {
-    noiseData[i] = (Math.random() * 2 - 1) * (1 - i / noiseData.length);
+    const progress = i / noiseData.length;
+    noiseData[i] = (Math.random() * 2 - 1) * Math.sin(progress * Math.PI) * (1 - progress * 0.35);
   }
+  const whoosh = context.createBufferSource();
+  const whooshGain = context.createGain();
+  const whooshFilter = context.createBiquadFilter();
+  whoosh.buffer = noiseBuffer;
+  whooshFilter.type = "bandpass";
+  whooshFilter.frequency.setValueAtTime(620, now);
+  whooshFilter.frequency.exponentialRampToValueAtTime(3600, now + 0.34);
+  whooshFilter.Q.setValueAtTime(0.75, now);
+  whooshGain.gain.setValueAtTime(0.001, now);
+  whooshGain.gain.exponentialRampToValueAtTime(0.18, now + 0.035);
+  whooshGain.gain.exponentialRampToValueAtTime(0.001, now + 0.42);
+  whoosh.connect(whooshFilter);
+  whooshFilter.connect(whooshGain);
+  whooshGain.connect(master);
+  whoosh.start(now);
+  whoosh.stop(now + 0.44);
+
+  [
+    { frequency: 587.33, start: now + 0.08, duration: 0.38, peak: 0.3, type: "triangle", sweep: 1.035 },
+    { frequency: 880, start: now + 0.12, duration: 0.58, peak: 0.34, type: "sine", sweep: 1.02 },
+    { frequency: 1174.66, start: now + 0.18, duration: 0.74, peak: 0.28, type: "sine", sweep: 1.015 },
+    { frequency: 1760, start: now + 0.28, duration: 0.84, peak: 0.17, type: "sine", sweep: 1.01 },
+    { frequency: 2349.32, start: now + 0.38, duration: 0.68, peak: 0.11, type: "triangle", detune: 5, sweep: 1.008 }
+  ].forEach(playTone);
+
   const shimmer = context.createBufferSource();
   const shimmerGain = context.createGain();
   const shimmerFilter = context.createBiquadFilter();
   shimmer.buffer = noiseBuffer;
   shimmerFilter.type = "highpass";
-  shimmerFilter.frequency.setValueAtTime(3800, now);
-  shimmerGain.gain.setValueAtTime(0.001, now + 0.08);
-  shimmerGain.gain.exponentialRampToValueAtTime(0.035, now + 0.11);
-  shimmerGain.gain.exponentialRampToValueAtTime(0.001, now + 0.38);
+  shimmerFilter.frequency.setValueAtTime(5200, now);
+  shimmerGain.gain.setValueAtTime(0.001, now + 0.18);
+  shimmerGain.gain.exponentialRampToValueAtTime(0.08, now + 0.22);
+  shimmerGain.gain.exponentialRampToValueAtTime(0.001, now + 0.62);
   shimmer.connect(shimmerFilter);
   shimmerFilter.connect(shimmerGain);
   shimmerGain.connect(master);
-  shimmer.start(now + 0.08);
-  shimmer.stop(now + 0.38);
+  shimmer.start(now + 0.16);
+  shimmer.stop(now + 0.66);
 
-  [2637.02, 3135.96].forEach((frequency, index) => {
+  [2637.02, 3135.96, 3951.07].forEach((frequency, index) => {
     playTone({
       frequency,
-      start: now + 0.46 + index * 0.07,
-      duration: 0.42,
-      peak: 0.055,
-      type: "sine"
+      start: now + 0.54 + index * 0.075,
+      duration: 0.48,
+      peak: 0.09,
+      type: "sine",
+      sweep: 1.006
     });
   });
 
-  window.setTimeout(() => context.close().catch(() => {}), 1700);
+  window.setTimeout(() => context.close().catch(() => {}), 2000);
 }
 
 // ── Envelope Screen ───────────────────────────────────────────────────────────
@@ -737,7 +763,7 @@ function Invitation({ config, isOpened }) {
       )}
       <section className="hero">
         <FallingGraduationIcons />
-        <PhotoCarousel photos={photos} graduateName={config.graduateName} />
+        <PhotoCarousel photos={photos} graduateName={config.graduateName} crops={config.heroImageCrops || {}} />
         <div className="hero-copy">
           <p className="eyebrow">Thư mời dự tốt nghiệp</p>
           <h1>{config.graduateName}</h1>
@@ -759,12 +785,14 @@ function Invitation({ config, isOpened }) {
         </section>
       )}
 
-      <section className="content-section intro" data-reveal>
-        <Sparkles size={22} />
-        <p>{config.greeting}</p>
-        <strong>{config.message}</strong>
-        {config.description && <span>{config.description}</span>}
-      </section>
+      {config.showIntroSection !== false && (
+        <section className="content-section intro" data-reveal>
+          <Sparkles size={22} />
+          <p>{config.greeting}</p>
+          <strong>{config.message}</strong>
+          {config.description && <span>{config.description}</span>}
+        </section>
+      )}
 
       {/* Lời nhắn riêng: ưu tiên tin nhắn của khách, fallback về config chung */}
       {(guest?.privateMessage || config.privateMessage) && (
@@ -840,10 +868,11 @@ function Invitation({ config, isOpened }) {
         </section>
       )}
 
-      <section className="content-section details" data-reveal>
-        <p>Dress code: {config.dressCode}</p>
-        <p>Trân trọng, {config.hostName}</p>
-      </section>
+      {config.thankYouMessage && (
+        <section className="content-section details thank-you-section" data-reveal>
+          <p>{config.thankYouMessage}</p>
+        </section>
+      )}
 
       <div className="action-bar">
         {config.mapUrl && (
@@ -865,7 +894,7 @@ function Invitation({ config, isOpened }) {
 
 // ── Photo Carousel ─────────────────────────────────────────────────────────────
 
-function PhotoCarousel({ photos, graduateName }) {
+function PhotoCarousel({ photos, graduateName, crops = {} }) {
   const [activeIndex, setActiveIndex] = useState(0);
   const touchStart = useRef(0);
   const touchDelta = useRef(0);
@@ -932,6 +961,9 @@ function PhotoCarousel({ photos, graduateName }) {
                   src={resolveAsset(photo)}
                   alt={`${graduateName} ${photoIndex + 1}`}
                   className={`photo-card ${photoIndex === 0 ? "main-photo" : "side-photo"}`}
+                  style={{
+                    objectPosition: `${crops[photo]?.x ?? 50}% ${crops[photo]?.y ?? 50}%`
+                  }}
                 />
               ))}
             </figure>
@@ -1052,7 +1084,10 @@ function Admin({ config, setConfig }) {
     setConfig((current) => ({
       ...current,
       heroImages: nextImages,
-      heroImage: current.heroImage === image ? nextImages[0] || "" : current.heroImage
+      heroImage: current.heroImage === image ? nextImages[0] || "" : current.heroImage,
+      heroImageCrops: Object.fromEntries(
+        Object.entries(current.heroImageCrops || {}).filter(([key]) => key !== image)
+      )
     }));
   };
 
@@ -1071,7 +1106,22 @@ function Admin({ config, setConfig }) {
     );
   };
 
-  const longTextFields = ["message", "greeting", "description", "privateMessage", "introGreetingTemplate"];
+  const updateHeroImageCrop = (image, axis, value) => {
+    const numericValue = Number(value);
+    setConfig((current) => ({
+      ...current,
+      heroImageCrops: {
+        ...(current.heroImageCrops || {}),
+        [image]: {
+          x: current.heroImageCrops?.[image]?.x ?? 50,
+          y: current.heroImageCrops?.[image]?.y ?? 50,
+          [axis]: numericValue
+        }
+      }
+    }));
+  };
+
+  const longTextFields = ["message", "greeting", "description", "privateMessage", "introGreetingTemplate", "thankYouMessage"];
   const heroImages = config.heroImages || [];
 
   const save = async () => {
@@ -1161,17 +1211,47 @@ function Admin({ config, setConfig }) {
               />
             </label>
             <div className="gallery-manager hero-image-manager">
-              {heroImages.map((image) => (
-                <div className="image-manager-item" key={image}>
-                  <button type="button" onClick={() => setPrimaryHeroImage(image)} title="Đặt làm ảnh chính đầu tiên">
-                    <img src={resolveAsset(image)} alt="Ảnh chính" />
-                    {config.heroImage === image && <span>Chính</span>}
-                  </button>
-                  <button type="button" className="delete-image-button" onClick={() => removeHeroImage(image)} title="Xóa ảnh">
-                    <Trash2 size={16} />
-                  </button>
-                </div>
-              ))}
+              {heroImages.map((image) => {
+                const crop = config.heroImageCrops?.[image] || { x: 50, y: 50 };
+
+                return (
+                  <div className="image-manager-item hero-crop-item" key={image}>
+                    <button type="button" onClick={() => setPrimaryHeroImage(image)} title="Đặt làm ảnh chính đầu tiên">
+                      <img
+                        src={resolveAsset(image)}
+                        alt="Ảnh chính"
+                        style={{ objectPosition: `${crop.x ?? 50}% ${crop.y ?? 50}%` }}
+                      />
+                      {config.heroImage === image && <span>Chính</span>}
+                    </button>
+                    <button type="button" className="delete-image-button" onClick={() => removeHeroImage(image)} title="Xóa ảnh">
+                      <Trash2 size={16} />
+                    </button>
+                    <div className="hero-crop-controls">
+                      <label>
+                        <small>Ngang</small>
+                        <input
+                          type="range"
+                          min="0"
+                          max="100"
+                          value={crop.x ?? 50}
+                          onChange={(e) => updateHeroImageCrop(image, "x", e.target.value)}
+                        />
+                      </label>
+                      <label>
+                        <small>Dọc</small>
+                        <input
+                          type="range"
+                          min="0"
+                          max="100"
+                          value={crop.y ?? 50}
+                          onChange={(e) => updateHeroImageCrop(image, "y", e.target.value)}
+                        />
+                      </label>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </section>
 
@@ -1206,6 +1286,14 @@ function Admin({ config, setConfig }) {
           </section>
 
           <section className="admin-panel form-grid">
+            <label className="wide checkbox-field">
+              <input
+                type="checkbox"
+                checked={config.showIntroSection !== false}
+                onChange={(e) => updateField("showIntroSection", e.target.checked)}
+              />
+              <span>Hiển thị ô lời mời trong giao diện client</span>
+            </label>
             {fields.map(([key, label, type = "text"]) => (
               <label key={key} className={longTextFields.includes(key) ? "wide" : ""}>
                 <span>{label}</span>

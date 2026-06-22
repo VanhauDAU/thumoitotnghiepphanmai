@@ -7,6 +7,7 @@
     "/uploads/1781772010069-943509256.jpeg",
     "/uploads/1781772016949-216949717.jpeg"
   ],
+  "heroImageCrops": {},
   "gallery": [
     "/uploads/1781771261982-711978501.jpg"
   ],
@@ -20,11 +21,12 @@
   "locationAddress": "123 Duong Le Loi, Quan 1, TP. Ho Chi Minh",
   "mapUrl": "",
   "hostName": "Gia dinh Nguyen",
+  "showIntroSection": false,
   "greeting": "Tran trong kinh moi ban den chung vui trong ngay le tot nghiep.",
   "message": "Su hien dien cua ban la niem vui va niem vinh hanh lon voi minh va gia dinh.",
   "privateMessage": "",
   "description": "",
-  "dressCode": "Lich su, trang nhã",
+  "thankYouMessage": "cảm ơn người đã đồng hành cùng tôi",
   "phone": "0900000000",
   "rsvpUrl": "",
   "backgroundMusic": "/uploads/1782148716152-535920981.mp3",

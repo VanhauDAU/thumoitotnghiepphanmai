@@ -110,8 +110,8 @@ a {
   margin: 0;
   padding: 12px;
   display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  grid-template-rows: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-rows: minmax(0, 1fr);
   gap: 12px;
 }
 
@@ -134,8 +134,8 @@ a {
 }
 
 .side-photo {
-  grid-column: 1;
-  grid-row: 2;
+  grid-column: 2;
+  grid-row: 1;
   min-height: 0;
   animation-delay: -1.6s;
 }
@@ -150,13 +150,13 @@ a {
 }
 
 .photo-count-2 {
-  grid-template-columns: minmax(0, 1fr);
-  grid-template-rows: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-rows: minmax(0, 1fr);
 }
 
 .photo-count-2 .side-photo {
-  grid-column: 1;
-  grid-row: 2;
+  grid-column: 2;
+  grid-row: 1;
 }
 
 .carousel-dots {
@@ -809,6 +809,24 @@ a {
   resize: vertical;
 }
 
+.form-grid .checkbox-field {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  border: 1px solid #eadbca;
+  border-radius: 8px;
+  background: #fffaf4;
+}
+
+.form-grid .checkbox-field input {
+  width: 18px;
+  height: 18px;
+  min-height: 0;
+  padding: 0;
+  accent-color: #2e5961;
+}
+
 .admin-error {
   margin: -4px 0 16px;
   padding: 12px 14px;
@@ -867,6 +885,49 @@ a {
   transition:
     transform 220ms ease,
     filter 220ms ease;
+}
+
+.hero-image-manager {
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+}
+
+.hero-crop-item {
+  padding: 8px;
+  border: 1px solid #eadbca;
+  border-radius: 10px;
+  background: #fffaf4;
+}
+
+.hero-crop-item > button:first-child {
+  position: relative;
+}
+
+.hero-crop-item img {
+  aspect-ratio: 3 / 4;
+  border: 3px solid #fff;
+  box-shadow: 0 8px 20px rgb(70 45 28 / 12%);
+}
+
+.hero-crop-controls {
+  display: grid;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.hero-crop-controls label {
+  display: grid;
+  gap: 4px;
+}
+
+.hero-crop-controls small {
+  color: #806853;
+  font-size: 0.74rem;
+  font-weight: 800;
+}
+
+.hero-crop-controls input[type="range"] {
+  width: 100%;
+  accent-color: #2e5961;
 }
 
 .image-manager-item span {
