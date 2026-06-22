@@ -671,7 +671,7 @@ function EnvelopeScreen({ config, guest, onOpen }) {
     if (!greetingDone || opening) return;
     playDefaultOpeningSound();
     // ✈️ Delay 1020ms để đồng bộ với animation paperPlaneFlight (CSS delay: 1.02s)
-    setTimeout(() => playAirplaneWhoosh(), 1480);
+    setTimeout(() => playAirplaneWhoosh(), 1620);
     setOpening(true);
     setConfetti(true);
     setTimeout(() => onOpen(), 2450);
