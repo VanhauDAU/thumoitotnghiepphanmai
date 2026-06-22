@@ -4934,12 +4934,18 @@ a {
 
   .env-envelope-row {
     min-height: 198px;
+    margin-top: -14px;
+    transform: translateY(-24px);
   }
 
   .env-mascot-gif {
     left: -8px;
-    bottom: 0;
+    bottom: 28px;
     width: clamp(122px, 35vw, 150px);
+  }
+
+  .envelope-wrap {
+    bottom: 22px;
   }
 
   .envelope-screen.greeting-done:not(.opening) .envelope-wrap::before,
@@ -4986,5 +4992,15 @@ a {
 
   .env-envelope-row {
     min-height: 184px;
+    margin-top: -18px;
+    transform: translateY(-26px);
+  }
+
+  .env-mascot-gif {
+    bottom: 30px;
+  }
+
+  .envelope-wrap {
+    bottom: 24px;
   }
 }
