@@ -41,6 +41,7 @@ const defaultConfig = {
   dressCode: "Lich su, trang nhã",
   phone: "0900000000",
   rsvpUrl: "",
+  backgroundMusic: "",
   notes: [
     "Vui long co mat truoc gio bat dau 15 phut.",
     "Trang phuc lich su, uu tien tong mau sang.",
@@ -169,6 +170,26 @@ app.put("/api/config", requireAdmin, async (req, res, next) => {
 });
 
 app.post("/api/upload", requireAdmin, upload.single("image"), (req, res) => {
+  res.status(201).json({
+    url: `/uploads/${req.file.filename}`,
+    filename: req.file.filename
+  });
+});
+
+const audioUpload = multer({
+  storage,
+  limits: { fileSize: 20 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
+    const allowed = ["audio/mpeg", "audio/mp3", "audio/wav", "audio/ogg", "audio/mp4", "audio/x-m4a", "audio/aac"];
+    if (!allowed.includes(file.mimetype) && !file.originalname.match(/\.(mp3|wav|ogg|m4a|aac)$/i)) {
+      cb(new Error("Chỉ chấp nhận file âm thanh (mp3, wav, ogg, m4a, aac)"));
+      return;
+    }
+    cb(null, true);
+  }
+});
+
+app.post("/api/upload-audio", requireAdmin, audioUpload.single("audio"), (req, res) => {
   res.status(201).json({
     url: `/uploads/${req.file.filename}`,
     filename: req.file.filename

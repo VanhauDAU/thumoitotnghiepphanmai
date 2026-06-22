@@ -16,15 +16,10 @@
   "eventTitle": "Lễ tốt nghiệp",
   "eventDate": "2026-07-20",
   "eventTime": "08:30",
-  "eventEndTime": "11:00",
   "locationName": "Hoi truong A",
   "locationAddress": "123 Duong Le Loi, Quan 1, TP. Ho Chi Minh",
   "mapUrl": "",
   "hostName": "Gia dinh Nguyen",
-  "musicUrl": "/uploads/music/1781836335899-Edd-Sheeran-Perfect-mp3-pm.mp3",
-  "musicTitle": "Edd Sheeran Perfect mp3 pm",
-  "introGreetingImage": "/uploads/intro-greeting.gif",
-  "introGreetingTemplate": "Kính gửi {quan hệ} {người được mời},\nHạnh trân trọng gửi lời mời tham dự lễ tốt nghiệp. Sự hiện diện của quý khách sẽ là niềm vui và vinh hạnh trong ngày đặc biệt này.",
   "greeting": "Tran trong kinh moi ban den chung vui trong ngay le tot nghiep.",
   "message": "Su hien dien cua ban la niem vui va niem vinh hanh lon voi minh va gia dinh.",
   "privateMessage": "",
@@ -32,6 +27,7 @@
   "dressCode": "Lich su, trang nhã",
   "phone": "0900000000",
   "rsvpUrl": "",
+  "backgroundMusic": "/uploads/1782148716152-535920981.mp3",
   "notes": [
     "Vui lòng có mặt trước giờ bắt đầu 15 phút.",
     "Trang phục lịch sự, ưu tiên tông màu sáng.",
@@ -50,5 +46,10 @@
       "title": "Ngoại khóa",
       "description": "Những chuyến đi, sự kiện và khoảnh khắc cùng bạn bè."
     }
-  ]
+  ],
+  "eventEndTime": "11:00",
+  "introGreetingImage": "/uploads/intro-greeting.gif",
+  "introGreetingTemplate": "Kính gửi {quan hệ} {người được mời},",
+  "musicUrl": "/uploads/music/1781836335899-Edd-Sheeran-Perfect-mp3-pm.mp3",
+  "musicTitle": "Edd Sheeran Perfect mp3 pm"
 }

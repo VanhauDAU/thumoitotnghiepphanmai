@@ -13,11 +13,13 @@ import {
   Link2,
   MapPin,
   Medal,
+  Music2,
   Plus,
   Save,
   Sparkles,
   Trash2,
-  Users
+  Users,
+  VolumeX
 } from "lucide-react";
 import "./styles.css";
 
@@ -66,6 +68,7 @@ const emptyConfig = {
   dressCode: "",
   phone: "",
   rsvpUrl: "",
+  backgroundMusic: "",
   notes: defaultNotes,
   memories: defaultMemories
 };
@@ -407,6 +410,77 @@ function FlipDigit({ value }) {
   );
 }
 
+function playDefaultOpeningSound() {
+  const AudioContext = window.AudioContext || window.webkitAudioContext;
+  if (!AudioContext) return;
+
+  const context = new AudioContext();
+  const now = context.currentTime;
+  const master = context.createGain();
+  master.gain.setValueAtTime(0.001, now);
+  master.gain.exponentialRampToValueAtTime(0.22, now + 0.025);
+  master.gain.exponentialRampToValueAtTime(0.001, now + 1.35);
+  master.connect(context.destination);
+
+  const playTone = ({ frequency, start, duration, peak = 0.28, type = "sine", detune = 0 }) => {
+    const oscillator = context.createOscillator();
+    const gain = context.createGain();
+
+    oscillator.type = type;
+    oscillator.frequency.setValueAtTime(frequency, start);
+    oscillator.detune.setValueAtTime(detune, start);
+    oscillator.frequency.exponentialRampToValueAtTime(frequency * 1.012, start + duration * 0.72);
+    gain.gain.setValueAtTime(0.001, start);
+    gain.gain.exponentialRampToValueAtTime(peak, start + 0.018);
+    gain.gain.exponentialRampToValueAtTime(0.001, start + duration);
+
+    oscillator.connect(gain);
+    gain.connect(master);
+    oscillator.start(start);
+    oscillator.stop(start + duration + 0.04);
+  };
+
+  [
+    { frequency: 523.25, start: now, duration: 0.34, peak: 0.2, type: "triangle" },
+    { frequency: 783.99, start: now + 0.055, duration: 0.46, peak: 0.26 },
+    { frequency: 1046.5, start: now + 0.12, duration: 0.62, peak: 0.22 },
+    { frequency: 1567.98, start: now + 0.24, duration: 0.74, peak: 0.12 },
+    { frequency: 2093, start: now + 0.34, duration: 0.58, peak: 0.08, detune: 7 }
+  ].forEach(playTone);
+
+  const noiseBuffer = context.createBuffer(1, context.sampleRate * 0.28, context.sampleRate);
+  const noiseData = noiseBuffer.getChannelData(0);
+  for (let i = 0; i < noiseData.length; i += 1) {
+    noiseData[i] = (Math.random() * 2 - 1) * (1 - i / noiseData.length);
+  }
+  const shimmer = context.createBufferSource();
+  const shimmerGain = context.createGain();
+  const shimmerFilter = context.createBiquadFilter();
+  shimmer.buffer = noiseBuffer;
+  shimmerFilter.type = "highpass";
+  shimmerFilter.frequency.setValueAtTime(3800, now);
+  shimmerGain.gain.setValueAtTime(0.001, now + 0.08);
+  shimmerGain.gain.exponentialRampToValueAtTime(0.035, now + 0.11);
+  shimmerGain.gain.exponentialRampToValueAtTime(0.001, now + 0.38);
+  shimmer.connect(shimmerFilter);
+  shimmerFilter.connect(shimmerGain);
+  shimmerGain.connect(master);
+  shimmer.start(now + 0.08);
+  shimmer.stop(now + 0.38);
+
+  [2637.02, 3135.96].forEach((frequency, index) => {
+    playTone({
+      frequency,
+      start: now + 0.46 + index * 0.07,
+      duration: 0.42,
+      peak: 0.055,
+      type: "sine"
+    });
+  });
+
+  window.setTimeout(() => context.close().catch(() => {}), 1700);
+}
+
 // ── Envelope Screen ───────────────────────────────────────────────────────────
 
 function EnvelopeScreen({ config, guest, onOpen }) {
@@ -434,6 +508,7 @@ function EnvelopeScreen({ config, guest, onOpen }) {
 
   const handleOpen = () => {
     if (!greetingDone || opening) return;
+    playDefaultOpeningSound();
     setOpening(true);
     setConfetti(true);
     setTimeout(() => onOpen(), 2450);
@@ -468,7 +543,7 @@ function EnvelopeScreen({ config, guest, onOpen }) {
 
       {/* Text tiêu đề phía trên */}
       <div className="env-header">
-        <p className="eyebrow" style={{ color: "rgb(255 246 228 / 80%)" }}>Bạn có một thư mời</p>
+        <p className="eyebrow" style={{ color: "rgb(255 246 228 / 80%)" }}>Bạn có một thư mời từ</p>
         <h1 className="env-name">{config.graduateName || "Lễ Tốt Nghiệp"}</h1>
         <div className="intro-greeting-card">
           {config.introGreetingImage && (
@@ -557,7 +632,68 @@ function EnvelopeScreen({ config, guest, onOpen }) {
   );
 }
 
-// ── Invitation ────────────────────────────────────────────────────────────────
+// ── Background Music Player ───────────────────────────────────────────────────────────────────
+
+function BackgroundMusic({ src, autoPlay }) {
+  const audioRef = useRef(null);
+  const [muted, setMuted] = useState(false);
+  const [started, setStarted] = useState(false);
+
+  // Khi autoPlay bật và có src → cố gắng phát
+  useEffect(() => {
+    if (!autoPlay || !src || !audioRef.current) return;
+    audioRef.current.volume = 0.55;
+    audioRef.current.loop = true;
+    const playPromise = audioRef.current.play();
+    if (playPromise !== undefined) {
+      playPromise
+        .then(() => setStarted(true))
+        .catch(() => {
+          // Autoplay bị chặn bởi trình duyệt → chờ user tương tác
+          const resume = () => {
+            audioRef.current?.play().then(() => setStarted(true)).catch(() => {});
+            window.removeEventListener("click", resume);
+            window.removeEventListener("touchstart", resume);
+          };
+          window.addEventListener("click", resume, { once: true });
+          window.addEventListener("touchstart", resume, { once: true });
+        });
+    }
+  }, [autoPlay, src]);
+
+  const toggleMute = () => {
+    if (!audioRef.current) return;
+    if (muted) {
+      audioRef.current.muted = false;
+      setMuted(false);
+    } else {
+      audioRef.current.muted = true;
+      setMuted(true);
+    }
+  };
+
+  if (!src) return null;
+
+  return (
+    <>
+      <audio ref={audioRef} src={src} loop preload="auto" />
+      <button
+        className={`music-toggle-btn${muted ? " muted" : ""}${started ? " playing" : ""}`}
+        onClick={toggleMute}
+        title={muted ? "Bật nhạc" : "Tắt nhạc"}
+        aria-label={muted ? "Bật nhạc nền" : "Tắt nhạc nền"}
+      >
+        <span className="music-disc" aria-hidden="true">
+          <span className="music-disc-ring" />
+          {muted ? <VolumeX size={19} /> : <Music2 size={20} />}
+        </span>
+        <span className="music-note-anim" aria-hidden="true">♪</span>
+      </button>
+    </>
+  );
+}
+
+// ── Invitation ────────────────────────────────────────────────────────────────────────────
 
 function Invitation({ config, isOpened }) {
   const countdown = useCountdown(config);
@@ -568,11 +704,37 @@ function Invitation({ config, isOpened }) {
     const merged = [...(config.heroImages || []), config.heroImage].filter(Boolean);
     return [...new Set(merged)];
   }, [config.heroImage, config.heroImages]);
+  const visibleNotes = useMemo(
+    () =>
+      (config.notes || [])
+        .map((note) => String(note || "").trim())
+        .filter(Boolean),
+    [config.notes]
+  );
+  const visibleMemories = useMemo(
+    () =>
+      (config.memories || [])
+        .map((item) => {
+          if (typeof item === "string") {
+            return { title: item.trim(), description: "" };
+          }
+          return {
+            title: String(item?.title || "").trim(),
+            description: String(item?.description || "").trim()
+          };
+        })
+        .filter((item) => item.title || item.description),
+    [config.memories]
+  );
 
   if (!checked) return null;
 
   return (
     <main className={`invitation-shell${isOpened ? " card-revealed" : ""}`}>
+      {/* Nhạc nền – chỉ phát khi thiếp đã được mở */}
+      {config.backgroundMusic && (
+        <BackgroundMusic src={config.backgroundMusic} autoPlay={isOpened} />
+      )}
       <section className="hero">
         <FallingGraduationIcons />
         <PhotoCarousel photos={photos} graduateName={config.graduateName} />
@@ -644,35 +806,39 @@ function Invitation({ config, isOpened }) {
         </section>
       )}
 
-      <section className="content-section memory-section" data-reveal>
-        <div className="section-heading">
-          <Medal size={22} />
-          <h2>Kỷ niệm đáng nhớ</h2>
-        </div>
-        <div className="memory-list">
-          {(config.memories || []).map((item, index) => (
-            <article key={`${item.title}-${index}`}>
-              <Award size={20} />
-              <div>
-                <h3>{item.title}</h3>
-                <p>{item.description}</p>
-              </div>
-            </article>
-          ))}
-        </div>
-      </section>
+      {visibleMemories.length > 0 && (
+        <section className="content-section memory-section" data-reveal>
+          <div className="section-heading">
+            <Medal size={22} />
+            <h2>Kỷ niệm đáng nhớ</h2>
+          </div>
+          <div className="memory-list">
+            {visibleMemories.map((item, index) => (
+              <article key={`${item.title}-${item.description}-${index}`}>
+                <Award size={20} />
+                <div>
+                  {item.title && <h3>{item.title}</h3>}
+                  {item.description && <p>{item.description}</p>}
+                </div>
+              </article>
+            ))}
+          </div>
+        </section>
+      )}
 
-      <section className="content-section note-section" data-reveal>
-        <div className="section-heading">
-          <Check size={22} />
-          <h2>Lưu ý</h2>
-        </div>
-        <ul>
-          {(config.notes || []).map((note, index) => (
-            <li key={`${note}-${index}`}>{note}</li>
-          ))}
-        </ul>
-      </section>
+      {visibleNotes.length > 0 && (
+        <section className="content-section note-section" data-reveal>
+          <div className="section-heading">
+            <Check size={22} />
+            <h2>Lưu ý</h2>
+          </div>
+          <ul>
+            {visibleNotes.map((note, index) => (
+              <li key={`${note}-${index}`}>{note}</li>
+            ))}
+          </ul>
+        </section>
+      )}
 
       <section className="content-section details" data-reveal>
         <p>Dress code: {config.dressCode}</p>
@@ -755,8 +921,7 @@ function PhotoCarousel({ photos, graduateName }) {
         {photos.map((image, index) => {
           const framePhotos = [
             image,
-            photos[(index + 1) % photos.length],
-            photos[(index + 2) % photos.length]
+            photos[(index + 1) % photos.length]
           ].filter((item, itemIndex, items) => item && items.indexOf(item) === itemIndex);
 
           return (
@@ -858,6 +1023,25 @@ function Admin({ config, setConfig }) {
       } else {
         updateField("gallery", [...(config.gallery || []), ...urls]);
       }
+    } catch (uploadError) {
+      setError(uploadError.message);
+    }
+  };
+
+  const uploadAudio = async (file, target) => {
+    if (!file) return;
+    setError("");
+    try {
+      const formData = new FormData();
+      formData.append("audio", file);
+      const res = await fetch("/api/upload-audio", {
+        method: "POST",
+        headers: authHeaders(),
+        body: formData
+      });
+      if (!res.ok) throw new Error("Không upload được âm thanh");
+      const data = await res.json();
+      updateField(target, data.url);
     } catch (uploadError) {
       setError(uploadError.message);
     }
@@ -1066,6 +1250,42 @@ function Admin({ config, setConfig }) {
             items={config.memories || []}
             onChange={(items) => updateField("memories", items)}
           />
+
+          {/* ─ Nhạc nền ─ */}
+          <section className="admin-panel music-panel">
+            <PanelTitle icon={<Music2 size={20} />} title="Nhạc nền (phát khi mở thiếp)" />
+            <div className="music-editor">
+              {config.backgroundMusic ? (
+                <div className="music-preview">
+                  <Music2 size={20} className="music-preview-icon" />
+                  <div className="music-preview-info">
+                    <span>{config.backgroundMusic.split("/").pop()}</span>
+                    <audio controls src={config.backgroundMusic} style={{ width: "100%", marginTop: 6 }} />
+                  </div>
+                  <button
+                    type="button"
+                    className="delete-image-button"
+                    style={{ position: "static", width: 32, height: 32 }}
+                    onClick={() => updateField("backgroundMusic", "")}
+                    title="Xóa nhạc"
+                  >
+                    <Trash2 size={15} />
+                  </button>
+                </div>
+              ) : (
+                <div className="music-empty">Chưa có nhạc nền. Tải lên file mp3, wav, m4a...</div>
+              )}
+              <label className="inline-upload">
+                <Music2 size={18} />
+                {config.backgroundMusic ? "Thay nhạc" : "Tải nhạc lên"}
+                <input
+                  type="file"
+                  accept="audio/mpeg,audio/mp3,audio/wav,audio/ogg,audio/mp4,audio/x-m4a,audio/aac,.mp3,.wav,.ogg,.m4a,.aac"
+                  onChange={(e) => uploadAudio(e.target.files?.[0], "backgroundMusic")}
+                />
+              </label>
+            </div>
+          </section>
         </>
       )}
 
