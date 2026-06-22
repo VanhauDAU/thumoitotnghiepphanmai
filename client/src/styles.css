@@ -3551,6 +3551,18 @@ a {
   z-index: 5;
 }
 
+.graduation-gate-effect .fireworks::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  background:
+    radial-gradient(circle at 28% 28%, rgb(255 224 112 / 22%), transparent 24%),
+    radial-gradient(circle at 72% 36%, rgb(142 202 230 / 20%), transparent 24%),
+    radial-gradient(circle at 48% 66%, rgb(255 147 147 / 18%), transparent 26%);
+  animation: fireworkScreenFlash 3.2s ease 0.4s both;
+}
+
 @keyframes gateOpenLeft {
   0% {
     transform: translateX(0);
@@ -4778,18 +4790,20 @@ a {
   width: 0;
   height: 0;
   opacity: 0;
-  animation: fireworkGlow 1.05s ease both;
+  animation: fireworkGlow 1.55s ease var(--burst-delay, 0s) both;
 }
 
 .firework-burst span {
   position: absolute;
-  width: 5px;
-  height: 5px;
+  width: 7px;
+  height: 7px;
   border-radius: 50%;
   background: var(--color);
-  box-shadow: 0 0 12px var(--color);
+  box-shadow:
+    0 0 12px var(--color),
+    0 0 24px var(--color);
   transform: translate(-50%, -50%);
-  animation: fireworkParticle 1.05s cubic-bezier(0.1, 0.7, 0.2, 1) both;
+  animation: fireworkParticle 1.55s cubic-bezier(0.1, 0.7, 0.2, 1) var(--burst-delay, 0s) both;
 }
 
 @keyframes fireworkGlow {
@@ -4821,7 +4835,20 @@ a {
 
   100% {
     opacity: 0;
-    transform: translate(calc(-50% + var(--tx)), calc(-50% + var(--ty))) scale(0.08);
+    transform: translate(calc(-50% + var(--tx)), calc(-50% + var(--ty))) scale(0.04);
+  }
+}
+
+@keyframes fireworkScreenFlash {
+  0%,
+  18%,
+  100% {
+    opacity: 0;
+  }
+
+  28%,
+  62% {
+    opacity: 1;
   }
 }
 

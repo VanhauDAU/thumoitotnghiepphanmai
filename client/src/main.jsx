@@ -417,15 +417,15 @@ function ConfettiBurst({ active }) {
 function Fireworks({ active }) {
   const bursts = useMemo(() => {
     if (!active) return [];
-    return Array.from({ length: 7 }, (_, burstIndex) => ({
+    return Array.from({ length: 10 }, (_, burstIndex) => ({
       id: burstIndex,
-      x: 14 + Math.random() * 72,
-      y: 12 + Math.random() * 46,
-      delay: burstIndex * 0.18,
-      particles: Array.from({ length: 18 }, (_, particleIndex) => {
-        const angle = (particleIndex / 18) * 360;
+      x: 10 + Math.random() * 80,
+      y: 12 + Math.random() * 62,
+      delay: 0.45 + burstIndex * 0.22,
+      particles: Array.from({ length: 24 }, (_, particleIndex) => {
+        const angle = (particleIndex / 24) * 360;
         const rad = (angle * Math.PI) / 180;
-        const dist = 56 + Math.random() * 48;
+        const dist = 78 + Math.random() * 62;
         return {
           id: particleIndex,
           tx: Math.cos(rad) * dist,
@@ -444,7 +444,7 @@ function Fireworks({ active }) {
         <div
           key={burst.id}
           className="firework-burst"
-          style={{ left: `${burst.x}%`, top: `${burst.y}%`, animationDelay: `${burst.delay}s` }}
+          style={{ left: `${burst.x}%`, top: `${burst.y}%`, "--burst-delay": `${burst.delay}s` }}
         >
           {burst.particles.map((particle) => (
             <span
