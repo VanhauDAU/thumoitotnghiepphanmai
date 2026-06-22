@@ -25,6 +25,7 @@ const defaultConfig = {
   gallery: [],
   schoolLogo: "",
   sashImage: "",
+  showcaseCaption: "",
   graduateName: "Nguyen Van A",
   degree: "Tan cu nhan Cong nghe thong tin",
   school: "Truong Dai hoc",

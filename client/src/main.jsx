@@ -55,6 +55,7 @@ const emptyConfig = {
   gallery: [],
   schoolLogo: "",
   sashImage: "",
+  showcaseCaption: "",
   graduateName: "",
   degree: "",
   school: "",
@@ -90,6 +91,7 @@ const fields = [
   ["degree", "Danh xưng / ngành học"],
   ["school", "Trường"],
   ["schoolSubtitle", "Tên trường phụ / tiếng Anh"],
+  ["showcaseCaption", "Dòng chữ dưới ảnh và sash"],
   ["eventTitle", "Tên sự kiện"],
   ["eventDate", "Ngày tổ chức", "date"],
   ["eventTime", "Giờ bắt đầu", "time"],
@@ -192,6 +194,28 @@ function formatEventTime(config) {
 function getEventYear(config) {
   const eventDate = getEventDateTime(config);
   return eventDate?.getFullYear() || new Date().getFullYear();
+}
+
+function getMapQuery(config) {
+  return [config.locationName, config.locationAddress].filter(Boolean).join(", ");
+}
+
+function getMapOpenUrl(config) {
+  if (config.mapUrl) return config.mapUrl;
+  const query = getMapQuery(config);
+  return query ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}` : "";
+}
+
+function getMapEmbedUrl(config) {
+  const query = getMapQuery(config) || config.mapUrl;
+  return query ? `https://maps.google.com/maps?q=${encodeURIComponent(query)}&output=embed` : "";
+}
+
+function getMonthTitle(date) {
+  return new Intl.DateTimeFormat("vi-VN", {
+    month: "long",
+    year: "numeric"
+  }).format(date);
 }
 
 function applyGreetingTemplate(template, guest) {
@@ -537,8 +561,16 @@ function playOpenSound() {
   }
 }
 
-function useScrollReveal() {
+function useScrollReveal(enabled) {
   useEffect(() => {
+    if (!enabled) return undefined;
+
+    const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (reduceMotion) {
+      document.querySelectorAll("[data-reveal]").forEach((el) => el.classList.add("revealed"));
+      return undefined;
+    }
+
     const observer = new IntersectionObserver(
       (entries) => {
         entries.forEach((entry) => {
@@ -551,10 +583,18 @@ function useScrollReveal() {
       { threshold: 0.08, rootMargin: "0px 0px -30px 0px" }
     );
     const raf = requestAnimationFrame(() => {
-      document.querySelectorAll("[data-reveal]").forEach((el) => observer.observe(el));
+      document.querySelectorAll("[data-reveal]").forEach((el, index) => {
+        el.style.setProperty("--reveal-order", index % 6);
+        const rect = el.getBoundingClientRect();
+        if (rect.top < window.innerHeight * 0.94) {
+          el.classList.add("revealed");
+          return;
+        }
+        observer.observe(el);
+      });
     });
     return () => { cancelAnimationFrame(raf); observer.disconnect(); };
-  }, []);
+  }, [enabled]);
 }
 
 // ── Flip Digit ────────────────────────────────────────────────────────────────
@@ -949,7 +989,6 @@ function InvitationCardHero({ config, guest }) {
 
   return (
     <section className="ceremony-card-hero" aria-label="Thiệp mời tốt nghiệp">
-      <FallingGraduationIcons />
       <div className="ceremony-card">
         <div className="school-brand">
           <div className="school-logo">
@@ -986,8 +1025,17 @@ function InvitationCardHero({ config, guest }) {
 function getRollingPhotoFrames(photos, frameSize = 4) {
   if (!photos.length) return [];
   return photos.map((_, startIndex) =>
-    Array.from({ length: Math.min(frameSize, photos.length) }, (_item, offset) => photos[(startIndex + offset) % photos.length])
+    Array.from({ length: frameSize }, (_item, offset) => photos[(startIndex + offset) % photos.length])
   );
+}
+
+function renderQuotedBoldText(text) {
+  if (!text) return null;
+  return text.split(/(".*?")/g).filter(Boolean).map((part, index) => {
+    const quoted = part.startsWith("\"") && part.endsWith("\"");
+    const content = quoted ? part.slice(1, -1) : part;
+    return quoted ? <strong key={`${part}-${index}`}>{content}</strong> : <span key={`${part}-${index}`}>{content}</span>;
+  });
 }
 
 function GraduateShowcase({ config }) {
@@ -998,12 +1046,13 @@ function GraduateShowcase({ config }) {
   }, [config.heroImage, config.heroImages]);
   const frames = useMemo(() => getRollingPhotoFrames(photos), [photos]);
   const hasManyFrames = frames.length > 1;
+  const showcaseCaption = config.showcaseCaption || "";
 
   useEffect(() => {
     if (!hasManyFrames) return undefined;
     const timer = window.setInterval(() => {
       setActiveIndex((current) => (current + 1) % frames.length);
-    }, 3600);
+    }, 2900);
     return () => window.clearInterval(timer);
   }, [frames.length, hasManyFrames]);
 
@@ -1015,19 +1064,26 @@ function GraduateShowcase({ config }) {
     <section className="graduate-showcase" data-reveal aria-label="Ảnh người tốt nghiệp và sash">
       <div className="graduate-photo-carousel">
         {frames.length ? (
-          <div className="graduate-photo-track" style={{ transform: `translateX(-${activeIndex * 100}%)` }}>
-            {frames.map((framePhotos, frameIndex) => (
-              <div className="graduate-photo-slide" key={`${framePhotos.join("-")}-${frameIndex}`}>
-                {framePhotos.map((photo, photoIndex) => (
-                  <img
-                    key={`${photo}-${photoIndex}`}
-                    src={resolveAsset(photo)}
-                    alt={`${config.graduateName || "Người tốt nghiệp"} ${photoIndex + 1}`}
-                  />
-                ))}
-              </div>
-            ))}
-          </div>
+          <>
+            <div className="graduate-photo-track" style={{ transform: `translateX(-${activeIndex * 100}%)` }}>
+              {frames.map((framePhotos, frameIndex) => (
+                <div
+                  className={`graduate-photo-slide${frameIndex === activeIndex ? " active" : ""}`}
+                  key={`${framePhotos.join("-")}-${frameIndex}`}
+                  aria-hidden={frameIndex !== activeIndex}
+                >
+                  {framePhotos.map((photo, photoIndex) => (
+                    <img
+                      key={`${photo}-${photoIndex}`}
+                      src={resolveAsset(photo)}
+                      alt={`${config.graduateName || "Người tốt nghiệp"} ${photoIndex + 1}`}
+                    />
+                  ))}
+                </div>
+              ))}
+            </div>
+            {hasManyFrames && <span className="graduate-photo-progress" key={activeIndex} aria-hidden="true" />}
+          </>
         ) : (
           <div className="graduate-photo-empty">
             <GraduationCap size={32} />
@@ -1045,6 +1101,89 @@ function GraduateShowcase({ config }) {
           </div>
         )}
       </aside>
+      {showcaseCaption && (
+        <p className="graduate-showcase-caption">
+          {renderQuotedBoldText(showcaseCaption)}
+        </p>
+      )}
+    </section>
+  );
+}
+
+function EventCalendar({ config }) {
+  const eventDate = getEventDateTime(config);
+  if (!eventDate) return null;
+
+  const year = eventDate.getFullYear();
+  const month = eventDate.getMonth();
+  const eventDay = eventDate.getDate();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const firstDay = new Date(year, month, 1).getDay();
+  const leadingEmptyDays = (firstDay + 6) % 7;
+  const calendarDays = [
+    ...Array.from({ length: leadingEmptyDays }, (_item, index) => ({ key: `empty-${index}`, empty: true })),
+    ...Array.from({ length: daysInMonth }, (_item, index) => ({ key: `day-${index + 1}`, day: index + 1 }))
+  ];
+
+  return (
+    <section className="event-calendar-card" data-reveal aria-label="Lịch ngày tốt nghiệp">
+      <Sparkles className="calendar-sparkle calendar-sparkle-1" size={16} aria-hidden="true" />
+      <Sparkles className="calendar-sparkle calendar-sparkle-2" size={14} aria-hidden="true" />
+      <h2>Congratulations</h2>
+      <p>{getMonthTitle(eventDate)}</p>
+      <div className="calendar-weekdays" aria-hidden="true">
+        {["T2", "T3", "T4", "T5", "T6", "T7", "CN"].map((day) => (
+          <span key={day}>{day}</span>
+        ))}
+      </div>
+      <div className="calendar-grid">
+        {calendarDays.map((item) => (
+          item.empty ? (
+            <span className="calendar-day empty" key={item.key} />
+          ) : (
+            <span className={`calendar-day${item.day === eventDay ? " event-day" : ""}`} key={item.key}>
+              {item.day}
+            </span>
+          )
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function MapSection({ config }) {
+  const embedUrl = getMapEmbedUrl(config);
+  const openUrl = getMapOpenUrl(config);
+  if (!embedUrl && !openUrl) return null;
+
+  return (
+    <section className="map-section" data-reveal aria-label="Bản đồ địa điểm tổ chức">
+      <Sparkles className="map-sparkle map-sparkle-1" size={14} aria-hidden="true" />
+      <Sparkles className="map-sparkle map-sparkle-2" size={12} aria-hidden="true" />
+      <div className="map-heading">
+        <h2>{config.eventTitle || "Lễ tốt nghiệp"}</h2>
+        {config.message && <p>{config.message}</p>}
+      </div>
+      <div className="map-location">
+        {config.locationName && <strong>{config.locationName}</strong>}
+        {config.locationAddress && <span>{config.locationAddress}</span>}
+      </div>
+      {embedUrl && (
+        <div className="map-frame">
+          <iframe
+            title="Bản đồ địa điểm tổ chức"
+            src={embedUrl}
+            loading="lazy"
+            referrerPolicy="no-referrer-when-downgrade"
+          />
+        </div>
+      )}
+      {openUrl && (
+        <a className="map-open-button" href={openUrl} target="_blank" rel="noreferrer">
+          <MapPin size={18} />
+          Mở Google Maps
+        </a>
+      )}
     </section>
   );
 }
@@ -1053,15 +1192,17 @@ function Invitation({ config, isOpened }) {
   const countdown = useCountdown(config);
   const { guest, checked, token } = useGuestToken();
   const { wishes, sendWish } = useWishes(isOpened && checked);
-  useScrollReveal();
+  useScrollReveal(checked);
 
   if (!checked) return null;
 
   return (
     <>
+      <FallingGraduationIcons />
       <main className={`invitation-shell${isOpened ? " card-revealed" : ""}`}>
         <InvitationCardHero config={config} guest={guest} />
         <GraduateShowcase config={config} />
+        <EventCalendar config={config} />
 
         <section className="content-section intro" data-reveal>
           <Sparkles size={22} />
@@ -1100,6 +1241,7 @@ function Invitation({ config, isOpened }) {
           <Info icon={<Clock />} label="Thời gian" value={formatEventTime(config)} />
           <Info icon={<MapPin />} label={config.locationName} value={config.locationAddress} />
         </section>
+        <MapSection config={config} />
 
         {(config.gallery || []).length > 0 && (
           <section className="memory-gallery" data-reveal>
@@ -1266,9 +1408,12 @@ function PhotoCarousel({ photos, graduateName }) {
 function FallingGraduationIcons() {
   return (
     <div className="falling-icons" aria-hidden="true">
-      {Array.from({ length: 14 }).map((_, index) => (
-        <span key={index} className={`falling-icon falling-icon-${index + 1}`}>
-          <GraduationCap size={index % 3 === 0 ? 24 : 18} />
+      {Array.from({ length: 24 }).map((_, index) => (
+        <span
+          key={index}
+          className={`falling-icon falling-icon-${index + 1} ${index % 2 === 0 ? "cap-icon" : "grade-icon"}`}
+        >
+          {index % 2 === 0 ? <GraduationCap size={index % 4 === 0 ? 24 : 19} /> : "A+"}
         </span>
       ))}
     </div>
@@ -1511,7 +1656,7 @@ function Admin({ config, setConfig }) {
     );
   };
 
-  const longTextFields = ["message", "greeting", "description", "privateMessage", "introGreetingTemplate"];
+  const longTextFields = ["message", "greeting", "description", "privateMessage", "introGreetingTemplate", "showcaseCaption"];
   const heroImages = config.heroImages || [];
 
   const save = async () => {
