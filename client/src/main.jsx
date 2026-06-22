@@ -7,18 +7,24 @@ import {
   Check,
   Clock,
   Copy,
+  Edit2,
   GraduationCap,
   Heart,
   ImagePlus,
   Link2,
   MapPin,
   Medal,
+  MessageCircle,
+  Mic,
   Music,
   Plus,
   Save,
+  Send,
   Sparkles,
+  Square,
   Trash2,
-  Users
+  Users,
+  X
 } from "lucide-react";
 import "./styles.css";
 
@@ -62,6 +68,8 @@ const emptyConfig = {
   musicTitle: "",
   musicVolume: 0.6,
   introGreetingImage: "",
+  introVoiceUrl: "",
+  introVoiceTitle: "",
   introGreetingTemplate: "Chào {quan hệ} {người được mời}, mình gửi bạn một chiếc thiệp nhỏ cho ngày tốt nghiệp thật đặc biệt này.",
   greeting: "",
   message: "",
@@ -125,6 +133,33 @@ function resolveAsset(url) {
   return url;
 }
 
+async function readApiError(res, fallback) {
+  const contentType = res.headers.get("content-type") || "";
+  if (!contentType.includes("application/json")) {
+    return "Server chưa cập nhật API lời chúc. Hãy restart backend hoặc deploy lại.";
+  }
+
+  try {
+    const data = await res.json();
+    return data?.message || fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+async function readJsonResponse(res, fallback) {
+  const contentType = res.headers.get("content-type") || "";
+  if (!contentType.includes("application/json")) {
+    throw new Error("Server chưa cập nhật API lời chúc. Hãy restart backend hoặc deploy lại.");
+  }
+
+  try {
+    return await res.json();
+  } catch {
+    throw new Error(fallback);
+  }
+}
+
 function getEventDateTime(config) {
   if (!config.eventDate) return null;
   const time = config.eventTime || "00:00";
@@ -161,6 +196,14 @@ function applyGreetingTemplate(template, guest) {
     .replaceAll("{nguoi duoc moi}", guestName)
     .replaceAll("{ten}", guestName)
     .replaceAll("{tên}", guestName);
+}
+
+function getIntroPhotos(config, guest) {
+  const heroPhotos = [...new Set([...(config.heroImages || []), config.heroImage].filter(Boolean))];
+  return {
+    guestPhoto: guest?.avatar || heroPhotos[1] || heroPhotos[0] || "",
+    hostPhoto: heroPhotos[0] || ""
+  };
 }
 
 function useTypewriter(text, speed = 42) {
@@ -241,10 +284,12 @@ function useConfig() {
 function useGuestToken() {
   const [guest, setGuest] = useState(null); // null = chưa biết, false = không có token/không tìm thấy
   const [checked, setChecked] = useState(false);
+  const [token, setToken] = useState("");
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const token = params.get("token");
+    setToken(token || "");
     if (!token) {
       setGuest(false);
       setChecked(true);
@@ -260,7 +305,7 @@ function useGuestToken() {
       .finally(() => setChecked(true));
   }, []);
 
-  return { guest, checked };
+  return { guest, checked, token };
 }
 
 // ── Confetti Burst ───────────────────────────────────────────────────────────
@@ -503,100 +548,6 @@ function useScrollReveal() {
   }, []);
 }
 
-function useAutoInvitationScroll(enabled) {
-  useEffect(() => {
-    if (!enabled) return undefined;
-
-    const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    if (reduceMotion) return undefined;
-
-    const sections = Array.from(document.querySelectorAll("[data-autoscroll-section]"));
-    if (!sections.length) return undefined;
-
-    let cancelled = false;
-    let timeoutId = 0;
-    let rafId = 0;
-    const scrollElement = document.scrollingElement || document.documentElement;
-
-    const clearActive = () => {
-      sections.forEach((section) => section.classList.remove("auto-scroll-active"));
-    };
-
-    const cancel = () => {
-      cancelled = true;
-      window.clearTimeout(timeoutId);
-      window.cancelAnimationFrame(rafId);
-      clearActive();
-    };
-
-    const animateScrollTo = (targetY, duration) =>
-      new Promise((resolve) => {
-        const startY = window.scrollY;
-        const distance = targetY - startY;
-        const startTime = performance.now();
-
-        const step = (now) => {
-          if (cancelled) {
-            resolve();
-            return;
-          }
-
-          const progress = Math.min((now - startTime) / duration, 1);
-          const eased = progress < 0.5
-            ? 4 * progress * progress * progress
-            : 1 - Math.pow(-2 * progress + 2, 3) / 2;
-          window.scrollTo(0, startY + distance * eased);
-
-          if (progress < 1) {
-            rafId = window.requestAnimationFrame(step);
-            return;
-          }
-          resolve();
-        };
-
-        rafId = window.requestAnimationFrame(step);
-      });
-
-    const run = async () => {
-      for (const section of sections) {
-        if (cancelled) break;
-        clearActive();
-        section.classList.add("auto-scroll-active");
-
-        const rect = section.getBoundingClientRect();
-        const maxScroll = scrollElement.scrollHeight - window.innerHeight;
-        const targetY = Math.max(
-          0,
-          Math.min(window.scrollY + rect.top - Math.max(72, (window.innerHeight - rect.height) / 2), maxScroll)
-        );
-        const distance = Math.abs(targetY - window.scrollY);
-        const duration = Math.min(3400, Math.max(1800, distance * 2.8));
-
-        await animateScrollTo(targetY, duration);
-        if (cancelled) break;
-        await new Promise((resolve) => {
-          timeoutId = window.setTimeout(resolve, 1450);
-        });
-      }
-    };
-
-    const startId = window.setTimeout(run, 3200);
-    timeoutId = startId;
-
-    window.addEventListener("wheel", cancel, { passive: true, once: true });
-    window.addEventListener("touchstart", cancel, { passive: true, once: true });
-    window.addEventListener("keydown", cancel, { once: true });
-
-    return () => {
-      window.clearTimeout(startId);
-      window.removeEventListener("wheel", cancel);
-      window.removeEventListener("touchstart", cancel);
-      window.removeEventListener("keydown", cancel);
-      cancel();
-    };
-  }, [enabled]);
-}
-
 // ── Flip Digit ────────────────────────────────────────────────────────────────
 
 function FlipDigit({ value }) {
@@ -621,18 +572,37 @@ function FlipDigit({ value }) {
 
 // ── Envelope Screen ───────────────────────────────────────────────────────────
 
+function IntroPortrait({ image, label, name, className = "" }) {
+  return (
+    <figure className={`intro-portrait ${className}`}>
+      <div className="intro-portrait-frame">
+        {image ? (
+          <img src={resolveAsset(image)} alt={name || label} />
+        ) : (
+          <div className="intro-portrait-empty">
+            <GraduationCap size={34} />
+          </div>
+        )}
+      </div>
+    </figure>
+  );
+}
+
 function EnvelopeScreen({ config, guest, onOpen }) {
   const [opening, setOpening] = useState(false);
   const [confetti, setConfetti] = useState(false);
   const envelopeRef = useRef(null);
-  const wrapRef = useRef(null);
+  const introVoicePlayedRef = useRef(false);
   const greetingText = useMemo(
     () => applyGreetingTemplate(config.introGreetingTemplate, guest),
     [config.introGreetingTemplate, guest]
   );
   const { displayed, done: greetingDone } = useTypewriter(greetingText);
+  const { guestPhoto, hostPhoto } = useMemo(() => getIntroPhotos(config, guest), [config, guest]);
+  const inviterName = config.graduateName || config.hostName || "Người mời";
+  const graduateName = config.graduateName || "Lễ Tốt Nghiệp";
+  const guestName = guest?.name || "Khách mời";
 
-  // Sparkle positions (stable, generated once)
   const sparkles = useMemo(() =>
     Array.from({ length: 9 }, (_, i) => ({
       id: i,
@@ -652,7 +622,6 @@ function EnvelopeScreen({ config, guest, onOpen }) {
     setTimeout(() => onOpen(), 2450);
   };
 
-  // 3D mouse tilt
   const onMouseMove = useCallback((e) => {
     if (!envelopeRef.current || opening) return;
     const rect = envelopeRef.current.getBoundingClientRect();
@@ -668,9 +637,40 @@ function EnvelopeScreen({ config, guest, onOpen }) {
     }
   }, []);
 
+  const playIntroVoice = useCallback(() => {
+    if (!config.introVoiceUrl || introVoicePlayedRef.current) return;
+    introVoicePlayedRef.current = true;
+    const audio = new Audio(resolveAsset(config.introVoiceUrl));
+    audio.volume = 1;
+    audio.play().catch(() => {
+      introVoicePlayedRef.current = false;
+    });
+  }, [config.introVoiceUrl]);
+
+  useEffect(() => {
+    introVoicePlayedRef.current = false;
+  }, [config.introVoiceUrl]);
+
+  useEffect(() => {
+    if (!greetingDone || opening) return undefined;
+
+    const timer = window.setTimeout(playIntroVoice, 140);
+    const playAfterInteraction = () => playIntroVoice();
+
+    window.addEventListener("pointerdown", playAfterInteraction, { once: true });
+    window.addEventListener("keydown", playAfterInteraction, { once: true });
+    window.addEventListener("touchstart", playAfterInteraction, { once: true });
+
+    return () => {
+      window.clearTimeout(timer);
+      window.removeEventListener("pointerdown", playAfterInteraction);
+      window.removeEventListener("keydown", playAfterInteraction);
+      window.removeEventListener("touchstart", playAfterInteraction);
+    };
+  }, [greetingDone, opening, playIntroVoice]);
+
   return (
     <div className={`envelope-screen${opening ? " opening" : ""}${greetingDone ? " greeting-done" : ""}`}>
-      {/* Nền rơi icon */}
       <div className="env-bg-icons" aria-hidden="true">
         {Array.from({ length: 18 }).map((_, i) => (
           <span key={i} className={`env-bg-icon env-bg-icon-${i + 1}`}>
@@ -679,87 +679,100 @@ function EnvelopeScreen({ config, guest, onOpen }) {
         ))}
       </div>
 
-      {/* Text tiêu đề phía trên */}
-      <div className="env-header">
-        <p className="eyebrow" style={{ color: "rgb(255 246 228 / 80%)" }}>Bạn có một thư mời</p>
-        <h1 className="env-name">{config.graduateName || "Lễ Tốt Nghiệp"}</h1>
+      <header className="env-header">
+        <p className="env-kicker">Bạn có một thiệp mời từ</p>
+        <h1 className="env-name">{inviterName}</h1>
         <div className="intro-greeting-card">
-          {config.introGreetingImage && (
-            <img
-              className="intro-greeting-image"
-              src={resolveAsset(config.introGreetingImage)}
-              alt=""
-              aria-hidden="true"
-            />
-          )}
+          <span className="intro-greeting-icon" aria-hidden="true">
+            <GraduationCap size={34} />
+          </span>
           <p className="typewriter-greeting">
             {displayed}
             {!greetingDone && <span className="typewriter-caret" aria-hidden="true" />}
           </p>
         </div>
-      </div>
+      </header>
 
-      {/* Phong bì với 3D tilt */}
-      <div
-        className="envelope-wrap"
-        ref={wrapRef}
-        onMouseMove={onMouseMove}
-        onMouseLeave={onMouseLeave}
-      >
+      <section className="env-photo-stage" aria-label="Ảnh khách mời và người mời">
+        <IntroPortrait
+          image={guestPhoto}
+          label="Khách mời"
+          name={guestName}
+          className="intro-portrait-guest"
+        />
+        <IntroPortrait
+          image={hostPhoto}
+          label="Người mời"
+          name={graduateName}
+          className="intro-portrait-host"
+        />
+      </section>
+
+      <div className="env-envelope-row">
+        {config.introGreetingImage && (
+          <img
+            className="env-mascot-gif"
+            src={resolveAsset(config.introGreetingImage)}
+            alt=""
+            aria-hidden="true"
+          />
+        )}
+
         <div
-          className="envelope"
-          ref={envelopeRef}
-          role="button"
-          tabIndex={greetingDone ? 0 : -1}
-          aria-label="Click vào tấm thiệp để mở"
-          onClick={handleOpen}
-          onKeyDown={(event) => {
-            if (event.key === "Enter" || event.key === " ") {
-              event.preventDefault();
-              handleOpen();
-            }
-          }}
-          style={{ transition: opening ? "transform 0.9s ease" : "transform 0.12s ease" }}
+          className="envelope-wrap"
+          onMouseMove={onMouseMove}
+          onMouseLeave={onMouseLeave}
         >
-          <div className="letter-card-reveal">
-            <p>Thư mời tốt nghiệp</p>
-            <strong>{config.graduateName || "Lễ Tốt Nghiệp"}</strong>
-            {guest && <span>Gửi {guest.relation} {guest.name}</span>}
-          </div>
-          {/* Nắp phong bì */}
-          <div className="envelope-flap">
-            <div className="envelope-flap-inner" />
-          </div>
-          {/* Thân phong bì */}
-          <div className="envelope-body">
-            <div className="envelope-seal">
-              <GraduationCap size={26} />
+          <div
+            className="envelope"
+            ref={envelopeRef}
+            role="button"
+            tabIndex={greetingDone ? 0 : -1}
+            aria-label="Click vào tấm thiệp để mở"
+            onClick={handleOpen}
+            onKeyDown={(event) => {
+              if (event.key === "Enter" || event.key === " ") {
+                event.preventDefault();
+                handleOpen();
+              }
+            }}
+            style={{ transition: opening ? "transform 0.9s ease" : "transform 0.12s ease" }}
+          >
+            <div className="letter-card-reveal">
+              <p>Thư mời tốt nghiệp</p>
+              <strong>{graduateName}</strong>
+              {guest && <span>Gửi {guest.relation} {guest.name}</span>}
             </div>
+            <div className="envelope-flap">
+              <div className="envelope-flap-inner" />
+            </div>
+            <div className="envelope-body">
+              <div className="envelope-seal">
+                <GraduationCap size={26} />
+              </div>
+            </div>
+            <div className="envelope-card-peek">
+              <Sparkles size={14} />
+              <span>Thư mời tốt nghiệp</span>
+            </div>
+            {sparkles.map((s) => (
+              <div
+                key={s.id}
+                className="env-sparkle-dot"
+                style={{
+                  width: s.size,
+                  height: s.size,
+                  left: `${s.x}%`,
+                  top: `${s.y}%`,
+                  animationDelay: `${s.delay}s`,
+                  animationDuration: `${s.dur}s`,
+                }}
+              />
+            ))}
           </div>
-          {/* Thẻ nhỏ bên trong ló ra khi mở */}
-          <div className="envelope-card-peek">
-            <Sparkles size={14} />
-            <span>Thư mời tốt nghiệp</span>
-          </div>
-          {/* Sparkle dots lung linh */}
-          {sparkles.map((s) => (
-            <div
-              key={s.id}
-              className="env-sparkle-dot"
-              style={{
-                width: s.size,
-                height: s.size,
-                left: `${s.x}%`,
-                top: `${s.y}%`,
-                animationDelay: `${s.delay}s`,
-                animationDuration: `${s.dur}s`,
-              }}
-            />
-          ))}
+          <ConfettiBurst active={confetti} />
+          <div className="flying-paper-plane" aria-hidden="true" />
         </div>
-        {/* Confetti nổ từ giữa phong bì */}
-        <ConfettiBurst active={confetti} />
-        <div className="flying-paper-plane" aria-hidden="true" />
       </div>
       <Fireworks active={confetti} />
 
@@ -772,11 +785,156 @@ function EnvelopeScreen({ config, guest, onOpen }) {
 
 // ── Invitation ────────────────────────────────────────────────────────────────
 
+function useWishes(enabled) {
+  const [wishes, setWishes] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  const loadWishes = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await fetch("/api/wishes?limit=40");
+      if (!res.ok) throw new Error(await readApiError(res, "Không tải được lời chúc."));
+      setWishes(await readJsonResponse(res, "Không tải được lời chúc."));
+      setError("");
+  } catch (wishError) {
+      setError("");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!enabled) return;
+    loadWishes();
+  }, [enabled, loadWishes]);
+
+  const sendWish = useCallback(async ({ token, message }) => {
+    const res = await fetch("/api/wishes", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ token, message })
+    });
+    if (!res.ok) throw new Error(await readApiError(res, "Không gửi được lời chúc."));
+    const wish = await readJsonResponse(res, "Không gửi được lời chúc.");
+    setWishes((current) => [wish, ...current.filter((item) => item.id !== wish.id)].slice(0, 40));
+    return wish;
+  }, []);
+
+  return { wishes, loading, error, sendWish };
+}
+
+function shuffleWishes(wishes) {
+  const shuffled = [...wishes];
+  for (let index = shuffled.length - 1; index > 0; index -= 1) {
+    const randomIndex = Math.floor(Math.random() * (index + 1));
+    [shuffled[index], shuffled[randomIndex]] = [shuffled[randomIndex], shuffled[index]];
+  }
+  return shuffled;
+}
+
+function WishBubbles({ wishes }) {
+  const [queue, setQueue] = useState([]);
+  const [page, setPage] = useState(0);
+  const pageSize = 2;
+
+  useEffect(() => {
+    const nextQueue = shuffleWishes(wishes || []);
+    setQueue(nextQueue);
+    setPage(0);
+  }, [wishes]);
+
+  useEffect(() => {
+    if (queue.length <= pageSize) return undefined;
+    const timer = window.setInterval(() => {
+      setPage((current) => (current + 1) % Math.ceil(queue.length / pageSize));
+    }, 4300);
+    return () => window.clearInterval(timer);
+  }, [queue.length]);
+
+  const visibleWishes = queue.slice(page * pageSize, page * pageSize + pageSize);
+  if (!visibleWishes.length) return null;
+
+  return (
+    <div className="wish-bubbles" aria-label="Lời chúc từ khách mời" key={`${page}-${queue.map((wish) => wish.id).join("-")}`}>
+      {visibleWishes.map((wish, index) => (
+        <article className={`wish-bubble wish-bubble-${index + 1}`} key={wish.id}>
+          <strong>{wish.name}:</strong> {wish.message}
+        </article>
+      ))}
+    </div>
+  );
+}
+
+function WishComposer({ guest, token, recipientName, onSend }) {
+  const [message, setMessage] = useState("");
+  const [sending, setSending] = useState(false);
+  const [sent, setSent] = useState(false);
+  const [localError, setLocalError] = useState("");
+
+  useEffect(() => {
+    if (!sent && !localError) return undefined;
+    const timer = window.setTimeout(() => {
+      setSent(false);
+      setLocalError("");
+    }, 2400);
+    return () => window.clearTimeout(timer);
+  }, [sent, localError]);
+
+  const submitWish = async (event) => {
+    event.preventDefault();
+    const cleanMessage = message.trim();
+    if (!cleanMessage || sending) return;
+
+    setSending(true);
+    setLocalError("");
+    setSent(false);
+    try {
+      await onSend({ token, message: cleanMessage });
+      setMessage("");
+      setSent(true);
+    } catch (wishError) {
+      setLocalError(
+        wishError.message.includes("Server chưa cập nhật")
+          ? "Chưa gửi được lời chúc. Vui lòng thử lại sau khi server cập nhật."
+          : wishError.message
+      );
+    } finally {
+      setSending(false);
+    }
+  };
+
+  if (!guest || !token) return null;
+
+  return (
+    <section className={`wish-composer${localError ? " has-error" : ""}${sent ? " has-success" : ""}`} aria-label="Gửi lời chúc">
+      <form onSubmit={submitWish}>
+        <MessageCircle size={18} aria-hidden="true" />
+        <input
+          value={message}
+          onChange={(event) => {
+            setMessage(event.target.value.slice(0, 180));
+            setSent(false);
+          }}
+          placeholder={`Chúc mừng ${recipientName || "người mời"}...`}
+          maxLength={180}
+        />
+        <button type="submit" disabled={sending || !message.trim()} title="Gửi lời chúc">
+          <Send size={17} />
+          <span>{sending ? "Đang gửi" : "Gửi"}</span>
+        </button>
+      </form>
+      {localError && <p className="wish-status error">{localError}</p>}
+      {sent && <p className="wish-status">Đã gửi lời chúc.</p>}
+    </section>
+  );
+}
+
 function Invitation({ config, isOpened }) {
   const countdown = useCountdown(config);
-  const { guest, checked } = useGuestToken();
+  const { guest, checked, token } = useGuestToken();
+  const { wishes, sendWish } = useWishes(isOpened && checked);
   useScrollReveal();
-  useAutoInvitationScroll(isOpened && checked);
 
   const photos = useMemo(() => {
     const merged = [...(config.heroImages || []), config.heroImage].filter(Boolean);
@@ -786,49 +944,54 @@ function Invitation({ config, isOpened }) {
   if (!checked) return null;
 
   return (
-    <main className={`invitation-shell${isOpened ? " card-revealed" : ""}`}>
-      <section className="hero">
-        <FallingGraduationIcons />
-        <PhotoCarousel photos={photos} graduateName={config.graduateName} />
-        <div className="hero-copy">
-          <p className="eyebrow">Thư mời dự tốt nghiệp</p>
-          <h1>{config.graduateName}</h1>
-          <p>{config.degree}</p>
-          <span>{config.school}</span>
-        </div>
-      </section>
-
-      {/* Banner cá nhân hóa – CHỈ hiển thị khi có khách hợp lệ */}
-      {guest && (
-        <section className="content-section guest-banner" data-reveal data-autoscroll-section>
-          <div className="guest-banner-inner">
-            <Heart size={20} className="guest-banner-icon" />
-            <p>
-              Kính mời <span className="guest-relation">{guest.relation}</span>{" "}
-              <strong className="guest-name">{guest.name}</strong>
-            </p>
+    <>
+      <main className={`invitation-shell${isOpened ? " card-revealed" : ""}`}>
+        <section className="hero">
+          <FallingGraduationIcons />
+          <PhotoCarousel photos={photos} graduateName={config.graduateName} />
+          <div className="hero-copy">
+            <p className="eyebrow">Thư mời dự tốt nghiệp</p>
+            <h1>{config.graduateName}</h1>
+            <p>{config.degree}</p>
+            <span>{config.school}</span>
           </div>
         </section>
-      )}
 
-      <section className="content-section intro" data-reveal data-autoscroll-section>
+        {/* Banner cá nhân hóa – CHỈ hiển thị khi có khách hợp lệ */}
+        {guest && (
+          <section className="content-section guest-banner" data-reveal>
+            <div className="guest-banner-inner">
+              {guest.avatar ? (
+                <img src={resolveAsset(guest.avatar)} alt={guest.name} className="guest-banner-avatar" />
+              ) : (
+                <Heart size={20} className="guest-banner-icon" />
+              )}
+              <p>
+                Kính mời <span className="guest-relation">{guest.relation}</span>{" "}
+                <strong className="guest-name">{guest.name}</strong>
+              </p>
+            </div>
+          </section>
+        )}
+
+      <section className="content-section intro" data-reveal>
         <Sparkles size={22} />
         <p>{config.greeting}</p>
         <strong>{config.message}</strong>
         {config.description && <span>{config.description}</span>}
       </section>
 
-      {config.privateMessage && (
-        <section className="content-section private-message" data-reveal data-autoscroll-section>
+      {(guest?.privateMessage || config.privateMessage) && (
+        <section className="content-section private-message" data-reveal>
           <Heart size={22} />
           <div>
             <p className="eyebrow">Lời nhắn gửi riêng</p>
-            <strong>{config.privateMessage}</strong>
+            <strong>{guest?.privateMessage || config.privateMessage}</strong>
           </div>
         </section>
       )}
 
-      <section className="countdown-section" data-reveal data-autoscroll-section>
+      <section className="countdown-section" data-reveal>
         <div>
           <p className="eyebrow">{config.eventTitle}</p>
           <h2>{countdown.expired ? "Hẹn gặp tại buổi lễ" : "Đếm ngược đến ngày vui"}</h2>
@@ -843,21 +1006,21 @@ function Invitation({ config, isOpened }) {
         </div>
       </section>
 
-      <section className="content-section event-grid" data-reveal data-autoscroll-section>
+      <section className="content-section event-grid" data-reveal>
         <Info icon={<CalendarDays />} label="Ngày" value={formatDate(config.eventDate)} />
         <Info icon={<Clock />} label="Thời gian" value={formatEventTime(config)} />
         <Info icon={<MapPin />} label={config.locationName} value={config.locationAddress} />
       </section>
 
       {(config.gallery || []).length > 0 && (
-        <section className="memory-gallery" data-reveal data-autoscroll-section>
+        <section className="memory-gallery" data-reveal>
           {(config.gallery || []).slice(0, 5).map((image, index) => (
             <img key={image} src={resolveAsset(image)} alt={`Khoảnh khắc ${index + 1}`} />
           ))}
         </section>
       )}
 
-      <section className="content-section memory-section" data-reveal data-autoscroll-section>
+      <section className="content-section memory-section" data-reveal>
         <div className="section-heading">
           <Medal size={22} />
           <h2>Kỷ niệm đáng nhớ</h2>
@@ -875,7 +1038,7 @@ function Invitation({ config, isOpened }) {
         </div>
       </section>
 
-      <section className="content-section note-section" data-reveal data-autoscroll-section>
+      <section className="content-section note-section" data-reveal>
         <div className="section-heading">
           <Check size={22} />
           <h2>Lưu ý</h2>
@@ -887,7 +1050,7 @@ function Invitation({ config, isOpened }) {
         </ul>
       </section>
 
-      <section className="content-section details" data-reveal data-autoscroll-section>
+      <section className="content-section details" data-reveal>
         <p>Dress code: {config.dressCode}</p>
         <p>Trân trọng, {config.hostName}</p>
       </section>
@@ -906,7 +1069,16 @@ function Invitation({ config, isOpened }) {
           </a>
         )}
       </div>
-    </main>
+      </main>
+
+      <WishBubbles wishes={wishes} />
+      <WishComposer
+        guest={guest}
+        token={token}
+        recipientName={config.graduateName || config.hostName}
+        onSend={sendWish}
+      />
+    </>
   );
 }
 
@@ -1036,6 +1208,10 @@ function Admin({ config, setConfig }) {
   const [activeTab, setActiveTab] = useState("config"); // "config" | "guests"
   const [musicTracks, setMusicTracks] = useState([]);
   const [musicLoading, setMusicLoading] = useState(false);
+  const [recordingIntroVoice, setRecordingIntroVoice] = useState(false);
+  const [introVoiceStatus, setIntroVoiceStatus] = useState("");
+  const introRecorderRef = useRef(null);
+  const introRecordingChunksRef = useRef([]);
 
   const updateField = (key, value) => {
     setConfig((current) => ({ ...current, [key]: value }));
@@ -1062,6 +1238,13 @@ function Admin({ config, setConfig }) {
     }
   }, [activeTab, fetchMusicTracks]);
 
+  useEffect(() => () => {
+    const recorder = introRecorderRef.current;
+    if (recorder?.stream) {
+      recorder.stream.getTracks().forEach((track) => track.stop());
+    }
+  }, []);
+
   const uploadOneImage = async (file) => {
     if (!file) return;
     const formData = new FormData();
@@ -1072,7 +1255,7 @@ function Admin({ config, setConfig }) {
       body: formData
     });
     if (!res.ok) {
-      throw new Error("Không upload được ảnh. Kiểm tra admin token nếu server có cấu hình.");
+      throw new Error(await readApiError(res, "Không upload được ảnh. Kiểm tra admin token hoặc dung lượng ảnh."));
     }
     return res.json();
   };
@@ -1097,27 +1280,109 @@ function Admin({ config, setConfig }) {
     }
   };
 
+  const uploadAudioFile = async (file) => {
+    const formData = new FormData();
+    formData.append("audio", file);
+    const res = await fetch("/api/upload-audio", {
+      method: "POST",
+      headers: authHeaders(),
+      body: formData
+    });
+    if (!res.ok) {
+      throw new Error(await readApiError(res, "Không upload được âm thanh. Kiểm tra admin token hoặc định dạng file."));
+    }
+    return res.json();
+  };
+
   const uploadMusic = async (files) => {
     const file = Array.from(files || [])[0];
     if (!file) return;
     setError("");
-    const formData = new FormData();
-    formData.append("audio", file);
     try {
-      const res = await fetch("/api/upload-audio", {
-        method: "POST",
-        headers: authHeaders(),
-        body: formData
-      });
-      if (!res.ok) {
-        throw new Error("Không upload được nhạc. Kiểm tra admin token hoặc định dạng file.");
-      }
-      const track = await res.json();
+      const track = await uploadAudioFile(file);
       setMusicTracks((current) => [track, ...current.filter((item) => item.url !== track.url)]);
       setConfig((current) => ({ ...current, musicUrl: track.url, musicTitle: track.title }));
     } catch (musicError) {
       setError(musicError.message);
     }
+  };
+
+  const getRecordingFileExtension = (mimeType) => {
+    if (mimeType.includes("mp4") || mimeType.includes("m4a")) return "m4a";
+    if (mimeType.includes("ogg")) return "ogg";
+    if (mimeType.includes("wav")) return "wav";
+    return "webm";
+  };
+
+  const startIntroVoiceRecording = async () => {
+    setError("");
+    setIntroVoiceStatus("");
+
+    if (!navigator.mediaDevices?.getUserMedia || !window.MediaRecorder) {
+      setError("Trình duyệt này chưa hỗ trợ ghi âm trực tiếp.");
+      return;
+    }
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const recorder = new MediaRecorder(stream);
+      introRecordingChunksRef.current = [];
+      introRecorderRef.current = recorder;
+
+      recorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          introRecordingChunksRef.current.push(event.data);
+        }
+      };
+
+      recorder.onstop = async () => {
+        stream.getTracks().forEach((track) => track.stop());
+        setRecordingIntroVoice(false);
+
+        const mimeType = recorder.mimeType || "audio/webm";
+        const blob = new Blob(introRecordingChunksRef.current, { type: mimeType });
+        if (!blob.size) {
+          setError("Không ghi được âm thanh. Hãy thử lại và cho phép micro.");
+          return;
+        }
+
+        setIntroVoiceStatus("Đang upload đoạn ghi âm...");
+        try {
+          const extension = getRecordingFileExtension(mimeType);
+          const file = new File([blob], `loi-nhac-mo-thiep.${extension}`, { type: mimeType });
+          const track = await uploadAudioFile(file);
+          setConfig((current) => ({
+            ...current,
+            introVoiceUrl: track.url,
+            introVoiceTitle: track.title || "Lời nhắc mở thiệp"
+          }));
+          setIntroVoiceStatus("Đã ghi âm. Nhớ bấm Lưu để áp dụng.");
+        } catch (recordError) {
+          setError(recordError.message);
+          setIntroVoiceStatus("");
+        }
+      };
+
+      recorder.start();
+      setRecordingIntroVoice(true);
+      setIntroVoiceStatus("Đang ghi âm...");
+    } catch {
+      setError("Không thể mở micro. Hãy kiểm tra quyền micro của trình duyệt.");
+      setRecordingIntroVoice(false);
+    }
+  };
+
+  const stopIntroVoiceRecording = () => {
+    const recorder = introRecorderRef.current;
+    if (recorder && recorder.state === "recording") {
+      recorder.stop();
+    }
+  };
+
+  const clearIntroVoice = () => {
+    updateField("introVoiceUrl", "");
+    updateField("introVoiceTitle", "");
+    setIntroVoiceStatus("");
   };
 
   const selectMusic = (url) => {
@@ -1287,6 +1552,41 @@ function Admin({ config, setConfig }) {
             </div>
           </section>
 
+          <section className="admin-panel voice-panel">
+            <PanelTitle icon={<Mic size={20} />} title="Ghi âm lời nhắc mở thiệp" />
+            <div className="voice-recorder">
+              <div className="voice-actions">
+                {!recordingIntroVoice ? (
+                  <button type="button" className="secondary-button" onClick={startIntroVoiceRecording}>
+                    <Mic size={18} />
+                    Bắt đầu ghi
+                  </button>
+                ) : (
+                  <button type="button" className="secondary-button recording-button" onClick={stopIntroVoiceRecording}>
+                    <Square size={18} />
+                    Dừng ghi
+                  </button>
+                )}
+                {config.introVoiceUrl && (
+                  <button type="button" className="secondary-button" onClick={clearIntroVoice}>
+                    <Trash2 size={18} />
+                    Xóa ghi âm
+                  </button>
+                )}
+              </div>
+              {introVoiceStatus && <small className="music-note">{introVoiceStatus}</small>}
+              {config.introVoiceUrl ? (
+                <audio className="music-preview" controls src={resolveAsset(config.introVoiceUrl)}>
+                  Trình duyệt không hỗ trợ phát ghi âm.
+                </audio>
+              ) : (
+                <small className="music-note">
+                  Đoạn ghi âm này sẽ tự phát một lần khi GIF vừa xuất hiện để nhắc khách mời mở thiệp.
+                </small>
+              )}
+            </div>
+          </section>
+
           <section className="admin-panel music-panel">
             <PanelTitle icon={<Music size={20} />} title="Nhạc nền" />
             <div className="music-editor">
@@ -1321,7 +1621,6 @@ function Admin({ config, setConfig }) {
                     onChange={(e) => {
                       const vol = parseFloat(e.target.value);
                       updateField("musicVolume", vol);
-                      if (audioRef?.current) audioRef.current.volume = vol;
                     }}
                     className="volume-slider"
                   />
@@ -1410,11 +1709,17 @@ function Admin({ config, setConfig }) {
 function GuestManager({ authHeaders }) {
   const [guests, setGuests] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [name, setName] = useState("");
-  const [relation, setRelation] = useState("Bạn");
-  const [creating, setCreating] = useState(false);
   const [error, setError] = useState("");
   const [copiedId, setCopiedId] = useState(null);
+  const [editingId, setEditingId] = useState(null);
+
+  // Form tạo mới
+  const [newName, setNewName] = useState("");
+  const [newRelation, setNewRelation] = useState("Bạn");
+  const [newPrivateMessage, setNewPrivateMessage] = useState("");
+  const [newAvatar, setNewAvatar] = useState("");
+  const [creating, setCreating] = useState(false);
+  const [uploadingNew, setUploadingNew] = useState(false);
 
   const baseUrl = `${window.location.protocol}//${window.location.host}`;
 
@@ -1422,7 +1727,7 @@ function GuestManager({ authHeaders }) {
     setLoading(true);
     try {
       const res = await fetch("/api/guests", { headers: authHeaders() });
-      if (!res.ok) throw new Error("Không tải được danh sách khách");
+      if (!res.ok) throw new Error(await readApiError(res, "Không tải được danh sách khách."));
       setGuests(await res.json());
     } catch (err) {
       setError(err.message);
@@ -1431,28 +1736,64 @@ function GuestManager({ authHeaders }) {
     }
   };
 
-  useEffect(() => {
-    fetchGuests();
-  }, []);
+  useEffect(() => { fetchGuests(); }, []);
+
+  const uploadAvatar = async (file) => {
+    if (!file) return "";
+    const formData = new FormData();
+    formData.append("image", file);
+    const res = await fetch("/api/upload", {
+      method: "POST",
+      headers: authHeaders(),
+      body: formData
+    });
+    if (!res.ok) {
+      throw new Error(await readApiError(res, "Không upload được ảnh. Kiểm tra admin token hoặc dung lượng ảnh."));
+    }
+    const data = await res.json();
+    return data.url;
+  };
+
+  const handleNewAvatarChange = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploadingNew(true);
+    setError("");
+    try {
+      const url = await uploadAvatar(file);
+      setNewAvatar(url);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setUploadingNew(false);
+      e.target.value = "";
+    }
+  };
 
   const createGuest = async (e) => {
     e.preventDefault();
-    if (!name.trim()) return;
+    if (!newName.trim()) return;
     setCreating(true);
     setError("");
     try {
       const res = await fetch("/api/guests", {
         method: "POST",
         headers: { "Content-Type": "application/json", ...authHeaders() },
-        body: JSON.stringify({ name: name.trim(), relation })
+        body: JSON.stringify({
+          name: newName.trim(),
+          relation: newRelation,
+          avatar: newAvatar,
+          privateMessage: newPrivateMessage.trim()
+        })
       });
       if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.message || "Không tạo được khách mời");
+        throw new Error(await readApiError(res, "Không tạo được khách mời."));
       }
       const guest = await res.json();
       setGuests((prev) => [guest, ...prev]);
-      setName("");
+      setNewName("");
+      setNewPrivateMessage("");
+      setNewAvatar("");
     } catch (err) {
       setError(err.message);
     } finally {
@@ -1461,14 +1802,16 @@ function GuestManager({ authHeaders }) {
   };
 
   const deleteGuest = async (id) => {
+    if (!window.confirm("Xóa khách mời này?")) return;
     setError("");
     try {
       const res = await fetch(`/api/guests/${id}`, {
         method: "DELETE",
         headers: authHeaders()
       });
-      if (!res.ok) throw new Error("Không xóa được khách");
+      if (!res.ok) throw new Error(await readApiError(res, "Không xóa được khách."));
       setGuests((prev) => prev.filter((g) => g.id !== id));
+      if (editingId === id) setEditingId(null);
     } catch (err) {
       setError(err.message);
     }
@@ -1487,8 +1830,7 @@ function GuestManager({ authHeaders }) {
       <PanelTitle icon={<Users size={20} />} title="Quản lý khách mời" />
 
       <p className="guest-manager-desc">
-        Tạo link cá nhân cho từng khách. Khi khách mở link, trang sẽ hiển thị lời mời có tên và quan hệ riêng.
-        Link mặc định (không có token) sẽ <strong>không</strong> hiển thị tên người được mời.
+        Tạo link cá nhân cho từng khách. Khách mở link sẽ thấy ảnh đại diện, tên và lời nhắn riêng.
       </p>
 
       {error && <p className="admin-error">{error}</p>}
@@ -1500,22 +1842,57 @@ function GuestManager({ authHeaders }) {
             <span>Tên khách mời</span>
             <input
               type="text"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
+              value={newName}
+              onChange={(e) => setNewName(e.target.value)}
               placeholder="Ví dụ: Nguyễn Văn An"
               required
             />
           </label>
           <label className="guest-form-field">
             <span>Quan hệ / Xưng hô</span>
-            <select value={relation} onChange={(e) => setRelation(e.target.value)}>
+            <select value={newRelation} onChange={(e) => setNewRelation(e.target.value)}>
               {RELATION_OPTIONS.map((r) => (
                 <option key={r} value={r}>{r}</option>
               ))}
             </select>
           </label>
         </div>
-        <button type="submit" disabled={creating || !name.trim()} className="guest-create-btn">
+        <label className="guest-form-field wide">
+          <span>Lời nhắn riêng (tuỳ chọn)</span>
+          <textarea
+            value={newPrivateMessage}
+            onChange={(e) => setNewPrivateMessage(e.target.value)}
+            placeholder="Lời nhắn đặc biệt chỉ khách này thấy..."
+            rows={2}
+          />
+        </label>
+        <div className="guest-avatar-upload-row">
+          <div className="guest-avatar-preview-wrap">
+            {newAvatar ? (
+              <div className="guest-avatar-preview">
+                <img src={resolveAsset(newAvatar)} alt="Ảnh xem trước" />
+                <button type="button" className="remove-avatar-btn" onClick={() => setNewAvatar("")} title="Xóa ảnh">
+                  <X size={14} />
+                </button>
+              </div>
+            ) : (
+              <div className="guest-avatar-empty">
+                <Camera size={22} />
+              </div>
+            )}
+          </div>
+          <label className="inline-upload">
+            <ImagePlus size={16} />
+            {uploadingNew ? "Đang upload..." : newAvatar ? "Thay ảnh" : "Ảnh đại diện"}
+            <input
+              type="file"
+              accept="image/*"
+              onChange={handleNewAvatarChange}
+              disabled={uploadingNew}
+            />
+          </label>
+        </div>
+        <button type="submit" disabled={creating || !newName.trim() || uploadingNew} className="guest-create-btn">
           <Link2 size={18} />
           {creating ? "Đang tạo..." : "Tạo link mời"}
         </button>
@@ -1527,51 +1904,224 @@ function GuestManager({ authHeaders }) {
         {!loading && guests.length === 0 && (
           <p className="guest-empty">Chưa có khách mời nào. Tạo link đầu tiên bên trên.</p>
         )}
-        {guests.map((guest) => {
-          const link = `${baseUrl}/?token=${guest.token}`;
-          return (
-            <div className="guest-item" key={guest.id}>
-              <div className="guest-info">
-                <div className="guest-name-row">
-                  <span className="guest-badge">{guest.relation}</span>
-                  <strong>{guest.name}</strong>
-                </div>
-                <a
-                  className="guest-link"
-                  href={link}
-                  target="_blank"
-                  rel="noreferrer"
-                  title="Mở link mời"
-                >
-                  {link}
-                </a>
-              </div>
-              <div className="guest-actions">
-                <button
-                  type="button"
-                  className={`copy-btn ${copiedId === guest.token ? "copied" : ""}`}
-                  onClick={() => copyLink(guest.token)}
-                  title="Sao chép link"
-                >
-                  {copiedId === guest.token ? <Check size={16} /> : <Copy size={16} />}
-                  {copiedId === guest.token ? "Đã sao chép" : "Sao chép"}
-                </button>
-                <button
-                  type="button"
-                  className="delete-guest-btn"
-                  onClick={() => deleteGuest(guest.id)}
-                  title="Xóa khách"
-                >
-                  <Trash2 size={16} />
-                </button>
-              </div>
-            </div>
-          );
-        })}
+        {guests.map((guest) => (
+          <GuestItem
+            key={guest.id}
+            guest={guest}
+            baseUrl={baseUrl}
+            copiedId={copiedId}
+            editingId={editingId}
+            onEdit={() => setEditingId(editingId === guest.id ? null : guest.id)}
+            onSave={(updated) => {
+              setGuests((prev) => prev.map((g) => g.id === updated.id ? updated : g));
+              setEditingId(null);
+            }}
+            onDelete={() => deleteGuest(guest.id)}
+            onCopy={() => copyLink(guest.token)}
+            authHeaders={authHeaders}
+            uploadAvatar={uploadAvatar}
+            onError={setError}
+          />
+        ))}
       </div>
     </section>
   );
 }
+
+// ── Guest Item (có inline edit) ────────────────────────────────────────────────
+
+function GuestItem({ guest, baseUrl, copiedId, editingId, onEdit, onSave, onDelete, onCopy, authHeaders, uploadAvatar, onError }) {
+  const isEditing = editingId === guest.id;
+  const [editName, setEditName] = useState(guest.name);
+  const [editRelation, setEditRelation] = useState(guest.relation);
+  const [editPrivateMessage, setEditPrivateMessage] = useState(guest.privateMessage || "");
+  const [editAvatar, setEditAvatar] = useState(guest.avatar || "");
+  const [saving, setSaving] = useState(false);
+  const [uploadingEdit, setUploadingEdit] = useState(false);
+
+  useEffect(() => {
+    if (!isEditing) {
+      setEditName(guest.name);
+      setEditRelation(guest.relation);
+      setEditPrivateMessage(guest.privateMessage || "");
+      setEditAvatar(guest.avatar || "");
+    }
+  }, [isEditing, guest]);
+
+  const handleEditAvatarChange = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploadingEdit(true);
+    try {
+      const url = await uploadAvatar(file);
+      setEditAvatar(url);
+    } catch (err) {
+      onError(err.message);
+    } finally {
+      setUploadingEdit(false);
+      e.target.value = "";
+    }
+  };
+
+  const handleSave = async () => {
+    if (!editName.trim()) return;
+    setSaving(true);
+    try {
+      const res = await fetch(`/api/guests/${guest.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", ...authHeaders() },
+        body: JSON.stringify({
+          name: editName.trim(),
+          relation: editRelation,
+          avatar: editAvatar,
+          privateMessage: editPrivateMessage.trim()
+        })
+      });
+      if (!res.ok) throw new Error(await readApiError(res, "Không lưu được thông tin khách."));
+      const updated = await res.json();
+      onSave(updated);
+    } catch (err) {
+      onError(err.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const link = `${baseUrl}/?token=${guest.token}`;
+
+  return (
+    <div className={`guest-item${isEditing ? " guest-item--editing" : ""}`}>
+      <div className="guest-item-main">
+        {/* Avatar */}
+        <div className="guest-avatar-thumb">
+          {guest.avatar ? (
+            <img src={resolveAsset(guest.avatar)} alt={guest.name} />
+          ) : (
+            <div className="guest-avatar-placeholder">
+              {guest.name.charAt(0).toUpperCase()}
+            </div>
+          )}
+        </div>
+
+        <div className="guest-info">
+          <div className="guest-name-row">
+            <span className="guest-badge">{guest.relation}</span>
+            <strong>{guest.name}</strong>
+            {guest.privateMessage && (
+              <span className="guest-has-msg" title="Có lời nhắn riêng">💬</span>
+            )}
+          </div>
+          <a className="guest-link" href={link} target="_blank" rel="noreferrer" title="Mở link mời">
+            {link}
+          </a>
+          {guest.privateMessage && (
+            <p className="guest-private-msg-preview">"{guest.privateMessage}"</p>
+          )}
+        </div>
+
+        <div className="guest-actions">
+          <button
+            type="button"
+            className={`copy-btn ${copiedId === guest.token ? "copied" : ""}`}
+            onClick={onCopy}
+            title="Sao chép link"
+          >
+            {copiedId === guest.token ? <Check size={16} /> : <Copy size={16} />}
+            {copiedId === guest.token ? "Đã sao chép" : "Sao chép"}
+          </button>
+          <button
+            type="button"
+            className={`edit-guest-btn${isEditing ? " active" : ""}`}
+            onClick={onEdit}
+            title="Sửa thông tin"
+          >
+            <Edit2 size={16} />
+          </button>
+          <button
+            type="button"
+            className="delete-guest-btn"
+            onClick={onDelete}
+            title="Xóa khách"
+          >
+            <Trash2 size={16} />
+          </button>
+        </div>
+      </div>
+
+      {/* Inline Edit Form */}
+      {isEditing && (
+        <div className="guest-edit-form">
+          <div className="guest-edit-avatar-row">
+            <div className="guest-avatar-preview-wrap">
+              {editAvatar ? (
+                <div className="guest-avatar-preview">
+                  <img src={resolveAsset(editAvatar)} alt="Ảnh xem trước" />
+                  <button type="button" className="remove-avatar-btn" onClick={() => setEditAvatar("")} title="Xóa ảnh">
+                    <X size={14} />
+                  </button>
+                </div>
+              ) : (
+                <div className="guest-avatar-empty">
+                  <Camera size={22} />
+                </div>
+              )}
+            </div>
+            <label className="inline-upload">
+              <ImagePlus size={16} />
+              {uploadingEdit ? "Đang upload..." : editAvatar ? "Thay ảnh" : "Ảnh đại diện"}
+              <input type="file" accept="image/*" onChange={handleEditAvatarChange} disabled={uploadingEdit} />
+            </label>
+          </div>
+          <div className="guest-edit-fields">
+            <label className="guest-form-field">
+              <span>Tên</span>
+              <input
+                type="text"
+                value={editName}
+                onChange={(e) => setEditName(e.target.value)}
+                placeholder="Tên khách mời"
+              />
+            </label>
+            <label className="guest-form-field">
+              <span>Quan hệ</span>
+              <select value={editRelation} onChange={(e) => setEditRelation(e.target.value)}>
+                {RELATION_OPTIONS.map((r) => (
+                  <option key={r} value={r}>{r}</option>
+                ))}
+              </select>
+            </label>
+          </div>
+          <label className="guest-form-field wide">
+            <span>Lời nhắn riêng</span>
+            <textarea
+              value={editPrivateMessage}
+              onChange={(e) => setEditPrivateMessage(e.target.value)}
+              placeholder="Lời nhắn đặc biệt chỉ khách này thấy..."
+              rows={2}
+            />
+          </label>
+          <div className="guest-edit-actions">
+            <button
+              type="button"
+              className="guest-save-btn"
+              onClick={handleSave}
+              disabled={saving || !editName.trim() || uploadingEdit}
+            >
+              <Save size={16} />
+              {saving ? "Đang lưu..." : "Lưu thay đổi"}
+            </button>
+            <button type="button" className="guest-cancel-btn" onClick={onEdit}>
+              <X size={16} />
+              Hủy
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+
 
 // ── Shared components ─────────────────────────────────────────────────────────
 

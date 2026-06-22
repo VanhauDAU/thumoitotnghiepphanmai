@@ -5,5 +5,14 @@
     "relation": "Bạn",
     "token": "a794c7b0261a8d646e110f34",
     "createdAt": "2026-06-19T01:47:44.740Z"
+  },
+  {
+    "id": "1782096302142-501248",
+    "name": "Lê Văn Hậu",
+    "relation": "Bạn",
+    "avatar": "/uploads/1782096289693-805521456.png",
+    "privateMessage": "Chào bạn, lời nhắn riêng nha",
+    "token": "24bc11d4d4bbc9a9585629b8",
+    "createdAt": "2026-06-22T02:45:02.142Z"
   }
 ]

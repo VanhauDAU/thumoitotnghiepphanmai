@@ -15,6 +15,7 @@ const uploadDir = process.env.UPLOAD_DIR || path.resolve(__dirname, "../uploads"
 const musicDir = path.join(uploadDir, "music");
 const configPath = path.join(dataDir, "config.json");
 const guestsPath = path.join(dataDir, "guests.json");
+const wishesPath = path.join(dataDir, "wishes.json");
 const clientDist = path.join(rootDir, "client/dist");
 const adminToken = process.env.ADMIN_TOKEN || "";
 
@@ -36,6 +37,8 @@ const defaultConfig = {
   musicUrl: "",
   musicTitle: "",
   introGreetingImage: "",
+  introVoiceUrl: "",
+  introVoiceTitle: "",
   introGreetingTemplate:
     "Chao {quan he} {nguoi duoc moi}, minh gui ban mot chiec thiep nho cho ngay tot nghiep that dac biet nay.",
   greeting: "Tran trong kinh moi ban den chung vui trong ngay le tot nghiep.",
@@ -83,6 +86,11 @@ async function ensureStorage() {
   } catch {
     await fs.writeFile(guestsPath, JSON.stringify([], null, 2));
   }
+  try {
+    await fs.access(wishesPath);
+  } catch {
+    await fs.writeFile(wishesPath, JSON.stringify([], null, 2));
+  }
 }
 
 async function readConfig() {
@@ -114,6 +122,22 @@ async function writeGuests(guests) {
   return guests;
 }
 
+async function readWishes() {
+  await ensureStorage();
+  try {
+    const raw = await fs.readFile(wishesPath, "utf8");
+    return JSON.parse(raw);
+  } catch {
+    return [];
+  }
+}
+
+async function writeWishes(wishes) {
+  await ensureStorage();
+  await fs.writeFile(wishesPath, JSON.stringify(wishes, null, 2));
+  return wishes;
+}
+
 const storage = multer.diskStorage({
   destination: async (_req, _file, cb) => {
     try {
@@ -132,10 +156,10 @@ const storage = multer.diskStorage({
 
 const upload = multer({
   storage,
-  limits: { fileSize: 8 * 1024 * 1024 },
+  limits: { fileSize: 20 * 1024 * 1024 },
   fileFilter: (_req, file, cb) => {
     if (!file.mimetype.startsWith("image/")) {
-      cb(new Error("Only image files are allowed"));
+      cb(new Error("Chỉ hỗ trợ file ảnh."));
       return;
     }
     cb(null, true);
@@ -172,12 +196,48 @@ const uploadAudio = multer({
   fileFilter: (_req, file, cb) => {
     const ext = path.extname(file.originalname).toLowerCase();
     if (!file.mimetype.startsWith("audio/") && !allowedAudioExts.has(ext)) {
-      cb(new Error("Only audio files are allowed"));
+      cb(new Error("Chỉ hỗ trợ file âm thanh."));
       return;
     }
     cb(null, true);
   }
 });
+
+function uploadSingleImage(req, res, next) {
+  upload.single("image")(req, res, (error) => {
+    if (error) {
+      if (error.code === "LIMIT_FILE_SIZE") {
+        res.status(413).json({ message: "Ảnh quá lớn. Vui lòng chọn ảnh tối đa 20MB." });
+        return;
+      }
+      res.status(400).json({ message: error.message || "Không upload được ảnh." });
+      return;
+    }
+    if (!req.file) {
+      res.status(400).json({ message: "Chưa chọn ảnh để upload." });
+      return;
+    }
+    next();
+  });
+}
+
+function uploadSingleAudio(req, res, next) {
+  uploadAudio.single("audio")(req, res, (error) => {
+    if (error) {
+      if (error.code === "LIMIT_FILE_SIZE") {
+        res.status(413).json({ message: "File nhạc quá lớn. Vui lòng chọn file tối đa 25MB." });
+        return;
+      }
+      res.status(400).json({ message: error.message || "Không upload được nhạc." });
+      return;
+    }
+    if (!req.file) {
+      res.status(400).json({ message: "Chưa chọn file nhạc để upload." });
+      return;
+    }
+    next();
+  });
+}
 
 function musicTitleFromFilename(filename) {
   return path
@@ -225,7 +285,7 @@ app.put("/api/config", requireAdmin, async (req, res, next) => {
   }
 });
 
-app.post("/api/upload", requireAdmin, upload.single("image"), (req, res) => {
+app.post("/api/upload", requireAdmin, uploadSingleImage, (req, res) => {
   res.status(201).json({
     url: `/uploads/${req.file.filename}`,
     filename: req.file.filename
@@ -251,12 +311,78 @@ app.get("/api/music", requireAdmin, async (_req, res, next) => {
   }
 });
 
-app.post("/api/upload-audio", requireAdmin, uploadAudio.single("audio"), (req, res) => {
+app.post("/api/upload-audio", requireAdmin, uploadSingleAudio, (req, res) => {
   res.status(201).json({
     url: `/uploads/music/${req.file.filename}`,
     filename: req.file.filename,
     title: musicTitleFromFilename(req.file.filename)
   });
+});
+
+// ── Wishes ───────────────────────────────────────────────────────────────────
+
+app.get("/api/wishes", async (req, res, next) => {
+  try {
+    const limit = Math.min(Math.max(Number(req.query.limit) || 12, 1), 40);
+    const wishes = await readWishes();
+    res.json(
+      wishes
+        .slice()
+        .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+        .slice(0, limit)
+        .map(({ id, name, relation, message, createdAt }) => ({
+          id,
+          name,
+          relation,
+          message,
+          createdAt
+        }))
+    );
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post("/api/wishes", async (req, res, next) => {
+  try {
+    const token = String(req.body.token || "");
+    const message = String(req.body.message || "").trim();
+
+    if (!message) {
+      return res.status(400).json({ message: "Vui lòng nhập lời chúc." });
+    }
+    if (message.length > 180) {
+      return res.status(400).json({ message: "Lời chúc tối đa 180 ký tự." });
+    }
+
+    const guests = await readGuests();
+    const guest = guests.find((item) => item.token === token);
+    if (!guest) {
+      return res.status(401).json({ message: "Link khách mời không hợp lệ." });
+    }
+
+    const wishes = await readWishes();
+    const wish = {
+      id: `${Date.now()}-${Math.round(Math.random() * 1e6)}`,
+      guestId: guest.id,
+      name: guest.name,
+      relation: guest.relation,
+      message,
+      createdAt: new Date().toISOString()
+    };
+
+    wishes.push(wish);
+    await writeWishes(wishes.slice(-200));
+    res.status(201).json({
+      id: wish.id,
+      name: wish.name,
+      relation: wish.relation,
+      message: wish.message,
+      createdAt: wish.createdAt
+    });
+  } catch (error) {
+    next(error);
+  }
 });
 
 // ── Guest management ──────────────────────────────────────────────────────────
@@ -269,8 +395,13 @@ app.get("/api/guest/:token", async (req, res, next) => {
     if (!guest) {
       return res.status(404).json({ message: "Guest not found" });
     }
-    // Chỉ trả về thông tin cần thiết cho trang mời
-    res.json({ name: guest.name, relation: guest.relation });
+    // Trả về thông tin cần thiết cho trang mời (bao gồm avatar và lời nhắn riêng)
+    res.json({
+      name: guest.name,
+      relation: guest.relation,
+      avatar: guest.avatar || "",
+      privateMessage: guest.privateMessage || ""
+    });
   } catch (error) {
     next(error);
   }
@@ -288,7 +419,7 @@ app.get("/api/guests", requireAdmin, async (_req, res, next) => {
 // Admin: tạo khách mới
 app.post("/api/guests", requireAdmin, async (req, res, next) => {
   try {
-    const { name, relation } = req.body;
+    const { name, relation, avatar, privateMessage } = req.body;
     if (!name || !name.trim()) {
       return res.status(400).json({ message: "Tên khách mời là bắt buộc" });
     }
@@ -298,12 +429,41 @@ app.post("/api/guests", requireAdmin, async (req, res, next) => {
       id: `${Date.now()}-${Math.round(Math.random() * 1e6)}`,
       name: name.trim(),
       relation: (relation || "Bạn").trim(),
+      avatar: avatar || "",
+      privateMessage: privateMessage || "",
       token,
       createdAt: new Date().toISOString()
     };
     guests.push(guest);
     await writeGuests(guests);
     res.status(201).json(guest);
+  } catch (error) {
+    next(error);
+  }
+});
+
+// Admin: sửa thông tin khách
+app.put("/api/guests/:id", requireAdmin, async (req, res, next) => {
+  try {
+    const { name, relation, avatar, privateMessage } = req.body;
+    if (name !== undefined && !name.trim()) {
+      return res.status(400).json({ message: "Tên khách mời không được để trống" });
+    }
+    const guests = await readGuests();
+    const index = guests.findIndex((g) => g.id === req.params.id);
+    if (index === -1) {
+      return res.status(404).json({ message: "Guest not found" });
+    }
+    const updated = {
+      ...guests[index],
+      ...(name !== undefined && { name: name.trim() }),
+      ...(relation !== undefined && { relation: relation.trim() }),
+      ...(avatar !== undefined && { avatar }),
+      ...(privateMessage !== undefined && { privateMessage })
+    };
+    guests[index] = updated;
+    await writeGuests(guests);
+    res.json(updated);
   } catch (error) {
     next(error);
   }
