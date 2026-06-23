@@ -15,6 +15,7 @@ const uploadDir = process.env.UPLOAD_DIR || path.resolve(__dirname, "../uploads"
 const configPath = path.join(dataDir, "config.json");
 const guestsPath = path.join(dataDir, "guests.json");
 const accessLogsPath = path.join(dataDir, "access-logs.json");
+const wishesPath = path.join(dataDir, "wishes.json");
 const clientDist = path.join(rootDir, "client/dist");
 const adminToken = process.env.ADMIN_TOKEN || "";
 const maxAccessLogs = 500;
@@ -45,6 +46,9 @@ const defaultConfig = {
   thankYouMessage: "Cam on ban da dong hanh cung minh.",
   phone: "0900000000",
   rsvpUrl: "",
+  guestbookEnabled: true,
+  guestbookTitle: "So luu but ngay tot nghiep",
+  guestbookPrompt: "Gui mot loi chuc nho de minh giu lai ky niem nay nhe.",
   backgroundMusic: "",
   musicVolume: 55,
   notes: [
@@ -86,6 +90,11 @@ async function ensureStorage() {
   } catch {
     await fs.writeFile(accessLogsPath, JSON.stringify([], null, 2));
   }
+  try {
+    await fs.access(wishesPath);
+  } catch {
+    await fs.writeFile(wishesPath, JSON.stringify([], null, 2));
+  }
 }
 
 async function readGuests() {
@@ -114,11 +123,27 @@ async function readAccessLogs() {
   }
 }
 
+async function readWishes() {
+  await ensureStorage();
+  try {
+    const raw = await fs.readFile(wishesPath, "utf8");
+    return JSON.parse(raw);
+  } catch {
+    return [];
+  }
+}
+
 async function writeAccessLogs(logs) {
   await ensureStorage();
   const trimmedLogs = logs.slice(0, maxAccessLogs);
   await fs.writeFile(accessLogsPath, JSON.stringify(trimmedLogs, null, 2));
   return trimmedLogs;
+}
+
+async function writeWishes(wishes) {
+  await ensureStorage();
+  await fs.writeFile(wishesPath, JSON.stringify(wishes, null, 2));
+  return wishes;
 }
 
 async function readConfig() {
@@ -393,6 +418,86 @@ app.get("/api/guest/:token", async (req, res, next) => {
       photo: guest.photo || "",
       photoCrop: guest.photoCrop || { x: 50, y: 50 }
     });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// ── Guestbook API ────────────────────────────────────────────────────────────
+
+app.get("/api/wishes", async (req, res, next) => {
+  try {
+    const limit = Math.min(Number(req.query.limit) || 8, 30);
+    const wishes = await readWishes();
+    res.json(wishes.slice(0, limit).map(({ id, name, relation, message, createdAt }) => ({
+      id,
+      name,
+      relation,
+      message,
+      createdAt
+    })));
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get("/api/admin/wishes", requireAdmin, async (_req, res, next) => {
+  try {
+    res.json(await readWishes());
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post("/api/wishes", async (req, res, next) => {
+  try {
+    const name = String(req.body.name || "").trim().slice(0, 80);
+    const relation = String(req.body.relation || "").trim().slice(0, 40);
+    const message = String(req.body.message || "").trim().slice(0, 500);
+    const token = String(req.body.token || "").trim();
+
+    if (!message) {
+      return res.status(400).json({ message: "Lời chúc không được để trống" });
+    }
+
+    let guest = null;
+    if (token) {
+      const guests = await readGuests();
+      guest = guests.find((item) => item.token === token) || null;
+    }
+
+    const wish = {
+      id: randomUUID(),
+      name: guest?.name || name || "Một vị khách thân mến",
+      relation: guest?.relation || relation || "",
+      message,
+      guestToken: guest ? token : "",
+      createdAt: new Date().toISOString()
+    };
+    const wishes = await readWishes();
+    wishes.unshift(wish);
+    await writeWishes(wishes.slice(0, 500));
+    res.status(201).json({
+      id: wish.id,
+      name: wish.name,
+      relation: wish.relation,
+      message: wish.message,
+      createdAt: wish.createdAt
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.delete("/api/admin/wishes/:id", requireAdmin, async (req, res, next) => {
+  try {
+    const wishes = await readWishes();
+    const filtered = wishes.filter((wish) => wish.id !== req.params.id);
+    if (filtered.length === wishes.length) {
+      return res.status(404).json({ message: "Không tìm thấy lời chúc" });
+    }
+    await writeWishes(filtered);
+    res.json({ ok: true });
   } catch (error) {
     next(error);
   }

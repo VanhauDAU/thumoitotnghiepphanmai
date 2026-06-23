@@ -4,7 +4,12 @@
     "token": "713ed5ba-9a73-404b-a8ef-199bab47a572",
     "name": "Lê Văn Hậu",
     "relation": "Bạn",
-    "privateMessage": "chào",
-    "createdAt": "2026-06-22T17:09:10.454Z"
+    "privateMessage": "chào bạn, mình có một vài lời nhắn gửi tới bạn, mình gặp nhau ở cổng trường nhé",
+    "createdAt": "2026-06-22T17:09:10.454Z",
+    "photo": "",
+    "photoCrop": {
+      "x": 50,
+      "y": 50
+    }
   }
 ]

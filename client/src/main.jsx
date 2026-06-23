@@ -14,9 +14,11 @@ import {
   Link2,
   MapPin,
   Medal,
+  MessageCircle,
   Music2,
   Plus,
   Save,
+  Send,
   Sparkles,
   Trash2,
   Users,
@@ -72,6 +74,9 @@ const emptyConfig = {
   thankYouMessage: "",
   phone: "",
   rsvpUrl: "",
+  guestbookEnabled: true,
+  guestbookTitle: "Sổ lưu bút ngày tốt nghiệp",
+  guestbookPrompt: "Gửi một lời chúc nhỏ để mình giữ lại kỷ niệm này nhé.",
   backgroundMusic: "",
   musicVolume: 55,
   notes: defaultNotes,
@@ -96,7 +101,9 @@ const fields = [
   ["privateMessage", "Lời nhắn gửi riêng"],
   ["description", "Mô tả thêm"],
   ["thankYouMessage", "Lời cảm ơn"],
-  ["rsvpUrl", "Link xác nhận tham dự"]
+  ["rsvpUrl", "Link xác nhận tham dự"],
+  ["guestbookTitle", "Tiêu đề sổ lưu bút"],
+  ["guestbookPrompt", "Gợi ý lời chúc trong sổ lưu bút"]
 ];
 
 const RELATION_OPTIONS = [
@@ -920,12 +927,156 @@ function BackgroundMusic({ src, autoPlay }) {
   );
 }
 
+function GuestbookSection({ config, guest, token }) {
+  const [wishes, setWishes] = useState([]);
+  const [name, setName] = useState(() => (guest ? `${guest.relation} ${guest.name}` : ""));
+  const [message, setMessage] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState("");
+  const [celebratingWish, setCelebratingWish] = useState(null);
+  const rollingWishes = useMemo(() => (wishes.length ? [...wishes, ...wishes] : []), [wishes]);
+
+  useEffect(() => {
+    setName(guest ? `${guest.relation} ${guest.name}` : "");
+  }, [guest]);
+
+  const fetchWishes = useCallback(async () => {
+    try {
+      const res = await fetch("/api/wishes?limit=12");
+      if (!res.ok) throw new Error("Không tải được sổ lưu bút");
+      setWishes(await res.json());
+    } catch {
+      setWishes([]);
+    }
+  }, []);
+
+  useEffect(() => { fetchWishes(); }, [fetchWishes]);
+
+  const submitWish = async (event) => {
+    event.preventDefault();
+    if (!message.trim()) return;
+    setSubmitting(true);
+    setError("");
+
+    try {
+      const res = await fetch("/api/wishes", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: name.trim(),
+          relation: guest?.relation || "",
+          message: message.trim(),
+          token
+        })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || "Không gửi được lời chúc");
+      setWishes((current) => [data, ...current].slice(0, 12));
+      setMessage("");
+      setCelebratingWish(data);
+      window.setTimeout(() => setCelebratingWish(null), 2200);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <section className="content-section guestbook-section" data-reveal>
+      <div className="guestbook-glow" aria-hidden="true" />
+      {celebratingWish && (
+        <div className="wish-flight" aria-hidden="true">
+          {Array.from({ length: 12 }).map((_, index) => (
+            <span
+              key={index}
+              style={{
+                "--x": `${(index % 6 - 2.5) * 22}px`,
+                "--y": `${-70 - index * 8}px`,
+                "--delay": `${index * 0.045}s`
+              }}
+            >
+              {index % 3 === 0 ? "✦" : index % 3 === 1 ? "♡" : "•"}
+            </span>
+          ))}
+        </div>
+      )}
+
+      <div className="section-heading guestbook-heading">
+        <MessageCircle size={22} />
+        <div>
+          <h2>{config.guestbookTitle || "Sổ lưu bút ngày tốt nghiệp"}</h2>
+          <p>{config.guestbookPrompt || "Gửi một lời chúc nhỏ để mình giữ lại kỷ niệm này nhé."}</p>
+        </div>
+      </div>
+
+      <form className="guestbook-form" onSubmit={submitWish}>
+        {!guest && (
+          <label>
+            <span>Tên của bạn</span>
+            <input
+              type="text"
+              value={name}
+              onChange={(event) => setName(event.target.value)}
+              placeholder="Ví dụ: Minh Anh"
+              maxLength={80}
+            />
+          </label>
+        )}
+        <label>
+          <span>Lời chúc</span>
+          <textarea
+            value={message}
+            onChange={(event) => setMessage(event.target.value)}
+            placeholder="Viết một lời chúc thật xinh ở đây..."
+            rows={4}
+            maxLength={500}
+          />
+        </label>
+        <div className="guestbook-actions">
+          <small>{message.trim().length}/500 ký tự</small>
+          <button type="submit" disabled={submitting || !message.trim()}>
+            <Send size={17} />
+            {submitting ? "Đang gửi..." : "Gửi lời chúc"}
+          </button>
+        </div>
+        {error && <p className="guestbook-error">{error}</p>}
+        {celebratingWish && <p className="guestbook-success">Lời chúc đã được cất vào sổ lưu bút.</p>}
+      </form>
+
+      {wishes.length > 0 && (
+        <div className="wish-wall">
+          <div className="wish-wall-title">
+            <Sparkles size={15} />
+            <span>Những lời chúc đang bay qua sổ lưu bút</span>
+          </div>
+          <div className="wish-marquee" style={{ "--wish-duration": `${Math.max(wishes.length, 3) * 4.8}s` }}>
+            <div className="wish-track">
+              {rollingWishes.map((wish, index) => (
+                <article
+                  key={`${wish.id}-${index}`}
+                  className={`wish-note wish-note-${(index % 3) + 1}`}
+                  aria-hidden={index >= wishes.length}
+                >
+                  <p>{wish.message}</p>
+                  <strong>{wish.relation ? `${wish.relation} ${wish.name}` : wish.name}</strong>
+                </article>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+    </section>
+  );
+}
+
 // ── Invitation ────────────────────────────────────────────────────────────────────────────
 
 function Invitation({ config, isOpened }) {
   const countdown = useCountdown(config);
   const { guest, checked } = useGuestToken();
   useScrollReveal();
+  const inviteToken = useMemo(() => new URLSearchParams(window.location.search).get("token") || "", []);
 
   const photos = useMemo(() => {
     const merged = [...(config.heroImages || []), config.heroImage].filter(Boolean);
@@ -1077,6 +1228,10 @@ function Invitation({ config, isOpened }) {
             ))}
           </ul>
         </section>
+      )}
+
+      {config.guestbookEnabled !== false && (
+        <GuestbookSection config={config} guest={guest} token={inviteToken} />
       )}
 
       {config.thankYouMessage && (
@@ -1263,7 +1418,7 @@ function Admin({ config, setConfig }) {
   const [saved, setSaved] = useState(false);
   const [adminToken, setAdminToken] = useState(() => localStorage.getItem("adminToken") || "");
   const [error, setError] = useState("");
-  const [activeTab, setActiveTab] = useState("config"); // "config" | "guests"
+  const [activeTab, setActiveTab] = useState("config"); // "config" | "guests" | "wishes"
 
   const updateField = (key, value) => {
     setConfig((current) => ({ ...current, [key]: value }));
@@ -1374,7 +1529,7 @@ function Admin({ config, setConfig }) {
     }));
   };
 
-  const longTextFields = ["message", "greeting", "description", "privateMessage", "introGreetingTemplate", "thankYouMessage"];
+  const longTextFields = ["message", "greeting", "description", "privateMessage", "introGreetingTemplate", "thankYouMessage", "guestbookPrompt"];
   const heroImages = config.heroImages || [];
 
   const save = async () => {
@@ -1438,6 +1593,13 @@ function Admin({ config, setConfig }) {
         >
           <ClipboardList size={16} />
           Nhật ký truy cập
+        </button>
+        <button
+          className={activeTab === "wishes" ? "active" : ""}
+          onClick={() => setActiveTab("wishes")}
+        >
+          <MessageCircle size={16} />
+          Sổ lưu bút
         </button>
       </div>
 
@@ -1553,6 +1715,14 @@ function Admin({ config, setConfig }) {
                 onChange={(e) => updateField("showIntroSection", e.target.checked)}
               />
               <span>Hiển thị ô lời mời trong giao diện client</span>
+            </label>
+            <label className="wide checkbox-field">
+              <input
+                type="checkbox"
+                checked={config.guestbookEnabled !== false}
+                onChange={(e) => updateField("guestbookEnabled", e.target.checked)}
+              />
+              <span>Hiển thị sổ lưu bút online cho khách gửi lời chúc</span>
             </label>
             {fields.map(([key, label, type = "text"]) => (
               <label key={key} className={longTextFields.includes(key) ? "wide" : ""}>
@@ -1671,6 +1841,10 @@ function Admin({ config, setConfig }) {
       {activeTab === "logs" && (
         <AccessLogPanel authHeaders={authHeaders} />
       )}
+
+      {activeTab === "wishes" && (
+        <WishesManager authHeaders={authHeaders} />
+      )}
     </main>
   );
 }
@@ -1744,6 +1918,84 @@ function AccessLogPanel({ authHeaders }) {
           })}
         </div>
       )}
+    </section>
+  );
+}
+
+// ── Wishes Manager ────────────────────────────────────────────────────────────
+
+function WishesManager({ authHeaders }) {
+  const [wishes, setWishes] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  const fetchWishes = async () => {
+    setLoading(true);
+    setError("");
+    try {
+      const res = await fetch("/api/admin/wishes", { headers: authHeaders() });
+      if (!res.ok) throw new Error("Không tải được sổ lưu bút");
+      setWishes(await res.json());
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { fetchWishes(); }, []);
+
+  const deleteWish = async (id) => {
+    setError("");
+    try {
+      const res = await fetch(`/api/admin/wishes/${id}`, { method: "DELETE", headers: authHeaders() });
+      if (!res.ok) throw new Error("Không xóa được lời chúc");
+      setWishes((current) => current.filter((wish) => wish.id !== id));
+    } catch (err) {
+      setError(err.message);
+    }
+  };
+
+  const formatWishTime = (value) => {
+    if (!value) return "";
+    return new Intl.DateTimeFormat("vi-VN", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit"
+    }).format(new Date(value));
+  };
+
+  return (
+    <section className="admin-panel wishes-manager">
+      <PanelTitle icon={<MessageCircle size={20} />} title="Sổ lưu bút online" />
+      <p className="guest-manager-desc">
+        Những lời chúc khách gửi từ thiệp sẽ được lưu ở đây. Lời mới nhất nằm trên cùng.
+      </p>
+
+      {error && <p className="admin-error">{error}</p>}
+      {loading && <p className="guest-loading">Đang tải lời chúc...</p>}
+      {!loading && wishes.length === 0 && (
+        <p className="guest-empty">Chưa có lời chúc nào. Khi khách gửi, lời chúc sẽ xuất hiện tại đây.</p>
+      )}
+
+      <div className="admin-wish-list">
+        {wishes.map((wish) => (
+          <article className="admin-wish-item" key={wish.id}>
+            <div>
+              <p>{wish.message}</p>
+              <div className="admin-wish-meta">
+                <strong>{wish.relation ? `${wish.relation} ${wish.name}` : wish.name}</strong>
+                <span>{formatWishTime(wish.createdAt)}</span>
+              </div>
+            </div>
+            <button type="button" className="delete-guest-btn" onClick={() => deleteWish(wish.id)} title="Xóa lời chúc">
+              <Trash2 size={16} />
+            </button>
+          </article>
+        ))}
+      </div>
     </section>
   );
 }

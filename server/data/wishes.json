@@ -1,0 +1,26 @@
+[
+  {
+    "id": "0271e886-586f-40a4-8d97-247e6a560974",
+    "name": "Lê Văn Hậu",
+    "relation": "Bạn",
+    "message": "Tốt nghiệp vui vẻ",
+    "guestToken": "713ed5ba-9a73-404b-a8ef-199bab47a572",
+    "createdAt": "2026-06-23T13:08:40.989Z"
+  },
+  {
+    "id": "ccf851f3-5838-4608-9348-61df5a0fb6ea",
+    "name": "Lê Văn Hậu",
+    "relation": "Bạn",
+    "message": "Chào bạn",
+    "guestToken": "713ed5ba-9a73-404b-a8ef-199bab47a572",
+    "createdAt": "2026-06-23T13:08:34.115Z"
+  },
+  {
+    "id": "d85a1543-9a12-465a-9356-9c8b8820e9f0",
+    "name": "Lê Văn Hậu",
+    "relation": "Bạn",
+    "message": "Cảm ơn bạn",
+    "guestToken": "713ed5ba-9a73-404b-a8ef-199bab47a572",
+    "createdAt": "2026-06-23T13:08:27.241Z"
+  }
+]
