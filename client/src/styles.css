@@ -1503,6 +1503,7 @@ a {
   gap: 8px;
   margin-bottom: 18px;
   border-bottom: 1px solid #e3d6c7;
+  overflow-x: auto;
 }
 
 .admin-tabs button {
@@ -1534,6 +1535,74 @@ a {
   display: flex;
   gap: 10px;
   align-items: center;
+}
+
+/* ── Access log ──────────────────────────────────────────────────────────── */
+
+.access-log-panel {
+  display: grid;
+  gap: 12px;
+}
+
+.access-log-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.access-log-header .panel-title {
+  margin-bottom: 0;
+}
+
+.access-log-table {
+  display: grid;
+  overflow: hidden;
+  border: 1px solid #e3d6c7;
+  border-radius: 8px;
+  background: #fff;
+}
+
+.access-log-row {
+  display: grid;
+  grid-template-columns: 170px minmax(160px, 1fr) minmax(260px, 1.4fr) 130px;
+  gap: 12px;
+  align-items: start;
+  padding: 12px 14px;
+  border-top: 1px solid #eee2d6;
+  color: #3a2d24;
+  font-size: 0.86rem;
+}
+
+.access-log-row:first-child {
+  border-top: 0;
+}
+
+.access-log-row-head {
+  background: #f7efe7;
+  color: #6d5847;
+  font-size: 0.78rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.access-log-row span {
+  min-width: 0;
+}
+
+.access-log-row strong {
+  display: block;
+  color: #2c241e;
+}
+
+.access-log-row small {
+  display: block;
+  margin-top: 3px;
+  color: #8a7262;
+  font-size: 0.76rem;
+  line-height: 1.35;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* ── Guest Manager ────────────────────────────────────────────────────────── */
@@ -1976,6 +2045,20 @@ a {
 
 
 @media (max-width: 520px) {
+  .access-log-header {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .access-log-row,
+  .access-log-row-head {
+    grid-template-columns: 1fr;
+  }
+
+  .access-log-row-head {
+    display: none;
+  }
+
   .guest-form-row {
     grid-template-columns: 1fr;
   }

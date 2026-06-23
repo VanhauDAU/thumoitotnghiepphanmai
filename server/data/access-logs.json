@@ -1,0 +1,19 @@
+[
+  {
+    "id": "ae466ae2-bfa6-4f39-a422-127f228df733",
+    "type": "admin",
+    "actor": "Admin",
+    "guestName": "",
+    "guestRelation": "",
+    "guestToken": "",
+    "path": "/api/admin-visit",
+    "ip": "::1",
+    "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36",
+    "device": {
+      "browser": "Chrome",
+      "platform": "macOS",
+      "type": "Máy tính"
+    },
+    "createdAt": "2026-06-23T06:19:51.716Z"
+  }
+]

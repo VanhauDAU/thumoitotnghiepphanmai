@@ -14,8 +14,10 @@ const dataDir = process.env.DATA_DIR || path.resolve(__dirname, "../data");
 const uploadDir = process.env.UPLOAD_DIR || path.resolve(__dirname, "../uploads");
 const configPath = path.join(dataDir, "config.json");
 const guestsPath = path.join(dataDir, "guests.json");
+const accessLogsPath = path.join(dataDir, "access-logs.json");
 const clientDist = path.join(rootDir, "client/dist");
 const adminToken = process.env.ADMIN_TOKEN || "";
+const maxAccessLogs = 500;
 
 const defaultConfig = {
   heroImage: "",
@@ -79,6 +81,11 @@ async function ensureStorage() {
   } catch {
     await fs.writeFile(guestsPath, JSON.stringify([], null, 2));
   }
+  try {
+    await fs.access(accessLogsPath);
+  } catch {
+    await fs.writeFile(accessLogsPath, JSON.stringify([], null, 2));
+  }
 }
 
 async function readGuests() {
@@ -97,6 +104,23 @@ async function writeGuests(guests) {
   return guests;
 }
 
+async function readAccessLogs() {
+  await ensureStorage();
+  try {
+    const raw = await fs.readFile(accessLogsPath, "utf8");
+    return JSON.parse(raw);
+  } catch {
+    return [];
+  }
+}
+
+async function writeAccessLogs(logs) {
+  await ensureStorage();
+  const trimmedLogs = logs.slice(0, maxAccessLogs);
+  await fs.writeFile(accessLogsPath, JSON.stringify(trimmedLogs, null, 2));
+  return trimmedLogs;
+}
+
 async function readConfig() {
   await ensureStorage();
   const raw = await fs.readFile(configPath, "utf8");
@@ -108,6 +132,64 @@ async function writeConfig(config) {
   const cleanConfig = { ...defaultConfig, ...config };
   await fs.writeFile(configPath, JSON.stringify(cleanConfig, null, 2));
   return cleanConfig;
+}
+
+function getClientIp(req) {
+  const forwardedFor = req.headers["x-forwarded-for"];
+  if (typeof forwardedFor === "string" && forwardedFor.trim()) {
+    return forwardedFor.split(",")[0].trim();
+  }
+  return req.ip || req.socket?.remoteAddress || "";
+}
+
+function detectDevice(userAgent = "") {
+  const lowerAgent = userAgent.toLowerCase();
+  const browser =
+    lowerAgent.includes("edg/") ? "Edge" :
+    lowerAgent.includes("chrome/") ? "Chrome" :
+    lowerAgent.includes("safari/") ? "Safari" :
+    lowerAgent.includes("firefox/") ? "Firefox" :
+    lowerAgent.includes("opr/") || lowerAgent.includes("opera") ? "Opera" :
+    "Không rõ";
+  const platform =
+    lowerAgent.includes("iphone") ? "iPhone" :
+    lowerAgent.includes("ipad") ? "iPad" :
+    lowerAgent.includes("android") ? "Android" :
+    lowerAgent.includes("mac os") ? "macOS" :
+    lowerAgent.includes("windows") ? "Windows" :
+    lowerAgent.includes("linux") ? "Linux" :
+    "Không rõ";
+  const type =
+    lowerAgent.includes("mobile") || lowerAgent.includes("iphone") || lowerAgent.includes("android")
+      ? "Điện thoại"
+      : lowerAgent.includes("ipad") || lowerAgent.includes("tablet")
+        ? "Máy tính bảng"
+        : "Máy tính";
+
+  return { browser, platform, type };
+}
+
+async function appendAccessLog(type, req, details = {}) {
+  try {
+    const userAgent = req.header("user-agent") || "";
+    const logs = await readAccessLogs();
+    const log = {
+      id: randomUUID(),
+      type,
+      actor: type === "admin" ? "Admin" : details.guestName || "Khách không xác định",
+      guestName: details.guestName || "",
+      guestRelation: details.guestRelation || "",
+      guestToken: details.guestToken || "",
+      path: req.originalUrl || req.url || "",
+      ip: getClientIp(req),
+      userAgent,
+      device: detectDevice(userAgent),
+      createdAt: new Date().toISOString()
+    };
+    await writeAccessLogs([log, ...logs]);
+  } catch (error) {
+    console.error("Cannot write access log", error);
+  }
 }
 
 const storage = multer.diskStorage({
@@ -199,6 +281,25 @@ app.post("/api/upload-audio", requireAdmin, audioUpload.single("audio"), (req, r
   });
 });
 
+// ── Access log API ───────────────────────────────────────────────────────────
+
+app.post("/api/admin-visit", requireAdmin, async (req, res, next) => {
+  try {
+    await appendAccessLog("admin", req);
+    res.status(201).json({ ok: true });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get("/api/access-logs", requireAdmin, async (_req, res, next) => {
+  try {
+    res.json(await readAccessLogs());
+  } catch (error) {
+    next(error);
+  }
+});
+
 // ── Guest API ────────────────────────────────────────────────────────────────
 
 // GET /api/guests — list all guests (admin)
@@ -279,6 +380,11 @@ app.get("/api/guest/:token", async (req, res, next) => {
     const guests = await readGuests();
     const guest = guests.find((g) => g.token === req.params.token);
     if (!guest) return res.status(404).json({ message: "Không tìm thấy" });
+    await appendAccessLog("guest", req, {
+      guestName: guest.name,
+      guestRelation: guest.relation,
+      guestToken: guest.token
+    });
     // Chỉ trả về thông tin cần thiết cho trang mời (không expose id nội bộ)
     res.json({
       name: guest.name,

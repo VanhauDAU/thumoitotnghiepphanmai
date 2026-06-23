@@ -5,6 +5,7 @@ import {
   CalendarDays,
   Camera,
   Check,
+  ClipboardList,
   Clock,
   Copy,
   GraduationCap,
@@ -156,6 +157,18 @@ function formatEventTime(config) {
     return `${config.eventTime} - ${config.eventEndTime}`;
   }
   return config.eventTime || config.eventEndTime;
+}
+
+function formatLogTime(value) {
+  if (!value) return "";
+  return new Intl.DateTimeFormat("vi-VN", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit"
+  }).format(new Date(value));
 }
 
 function applyGreetingTemplate(template, guest) {
@@ -1258,6 +1271,13 @@ function Admin({ config, setConfig }) {
 
   const authHeaders = () => (adminToken ? { "x-admin-token": adminToken } : {});
 
+  useEffect(() => {
+    fetch("/api/admin-visit", {
+      method: "POST",
+      headers: authHeaders()
+    }).catch(() => {});
+  }, [adminToken]);
+
   const uploadOneImage = async (file) => {
     if (!file) return;
     const formData = new FormData();
@@ -1411,6 +1431,13 @@ function Admin({ config, setConfig }) {
         >
           <Users size={16} />
           Quản lý khách mời
+        </button>
+        <button
+          className={activeTab === "logs" ? "active" : ""}
+          onClick={() => setActiveTab("logs")}
+        >
+          <ClipboardList size={16} />
+          Nhật ký truy cập
         </button>
       </div>
 
@@ -1640,7 +1667,84 @@ function Admin({ config, setConfig }) {
       {activeTab === "guests" && (
         <GuestManager authHeaders={authHeaders} />
       )}
+
+      {activeTab === "logs" && (
+        <AccessLogPanel authHeaders={authHeaders} />
+      )}
     </main>
+  );
+}
+
+function AccessLogPanel({ authHeaders }) {
+  const [logs, setLogs] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  const fetchLogs = async () => {
+    setLoading(true);
+    setError("");
+    try {
+      const res = await fetch("/api/access-logs", { headers: authHeaders() });
+      if (!res.ok) throw new Error("Không tải được nhật ký truy cập");
+      setLogs(await res.json());
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { fetchLogs(); }, []);
+
+  return (
+    <section className="admin-panel access-log-panel">
+      <div className="access-log-header">
+        <PanelTitle icon={<ClipboardList size={20} />} title="Nhật ký truy cập" />
+        <button type="button" className="secondary-button" onClick={fetchLogs} disabled={loading}>
+          {loading ? "Đang tải" : "Tải lại"}
+        </button>
+      </div>
+
+      <p className="guest-manager-desc">
+        Ghi lại admin mở trang quản trị và từng khách mời mở link cá nhân, kèm IP, trình duyệt và loại thiết bị.
+      </p>
+
+      {error && <p className="admin-error">{error}</p>}
+      {loading && <p className="guest-loading">Đang tải...</p>}
+      {!loading && logs.length === 0 && <p className="guest-empty">Chưa có lượt truy cập nào.</p>}
+
+      {!loading && logs.length > 0 && (
+        <div className="access-log-table">
+          <div className="access-log-row access-log-row-head">
+            <span>Thời gian</span>
+            <span>Ai vào</span>
+            <span>Máy nào vào</span>
+            <span>IP</span>
+          </div>
+          {logs.map((log) => {
+            const device = log.device || {};
+            const actor =
+              log.type === "admin"
+                ? "Admin"
+                : `${log.guestRelation ? `${log.guestRelation} ` : ""}${log.guestName || log.actor || "Khách"}`;
+            return (
+              <div className="access-log-row" key={log.id}>
+                <span>{formatLogTime(log.createdAt)}</span>
+                <span>
+                  <strong>{actor}</strong>
+                  <small>{log.type === "admin" ? "Trang quản trị" : "Link khách mời"}</small>
+                </span>
+                <span>
+                  {device.type || "Không rõ"} · {device.platform || "Không rõ"} · {device.browser || "Không rõ"}
+                  <small title={log.userAgent}>{log.userAgent || "Không có user-agent"}</small>
+                </span>
+                <span>{log.ip || "Không rõ"}</span>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </section>
   );
 }
 
