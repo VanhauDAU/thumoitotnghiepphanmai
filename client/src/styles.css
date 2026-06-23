@@ -425,6 +425,7 @@ a {
   font-size: 1.22rem;
   line-height: 1.38;
   font-weight: 500;
+  white-space: pre-wrap;
 }
 
 .countdown-section {
