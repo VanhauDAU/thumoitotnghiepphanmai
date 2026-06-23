@@ -1077,78 +1077,6 @@ function Invitation({ config, isOpened }) {
   const { guest, checked } = useGuestToken();
   useScrollReveal();
   const inviteToken = useMemo(() => new URLSearchParams(window.location.search).get("token") || "", []);
-  const privateMessageRef = useRef(null);
-  const voicePlayedRef = useRef(false);
-
-  useEffect(() => {
-    if (!isOpened) return;
-    const textToSpeak = guest?.privateMessage || config.privateMessage;
-    if (!textToSpeak) return;
-
-    if (voicePlayedRef.current) return;
-
-    const observer = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry) => {
-          if (entry.isIntersecting && !voicePlayedRef.current) {
-            voicePlayedRef.current = true;
-            observer.disconnect();
-
-            const synth = window.speechSynthesis;
-            if (synth) {
-              synth.cancel();
-
-              const getViVoice = () => {
-                const voices = synth.getVoices();
-                return voices.find(v => 
-                  (v.lang.includes("vi") || v.lang.includes("VI")) && 
-                  (v.name.toLowerCase().includes("female") || 
-                   v.name.toLowerCase().includes("linh") || 
-                   v.name.toLowerCase().includes("huyen") ||
-                   v.name.toLowerCase().includes("an"))
-                ) || voices.find(v => v.lang.includes("vi") || v.lang.includes("VI"));
-              };
-
-              const speak = () => {
-                const utterance = new SpeechSynthesisUtterance(textToSpeak);
-                utterance.lang = "vi-VN";
-                const viVoice = getViVoice();
-                if (viVoice) {
-                  utterance.voice = viVoice;
-                }
-                utterance.rate = 0.95;
-                utterance.pitch = 1.05;
-                synth.speak(utterance);
-              };
-
-              if (synth.getVoices().length === 0) {
-                const onVoicesChanged = () => {
-                  speak();
-                  synth.removeEventListener("voiceschanged", onVoicesChanged);
-                };
-                synth.addEventListener("voiceschanged", onVoicesChanged);
-              } else {
-                speak();
-              }
-            }
-          }
-        });
-      },
-      { threshold: 0.25 }
-    );
-
-    const currentRef = privateMessageRef.current;
-    if (currentRef) {
-      observer.observe(currentRef);
-    }
-
-    return () => {
-      if (currentRef) {
-        observer.unobserve(currentRef);
-      }
-      observer.disconnect();
-    };
-  }, [isOpened, guest?.privateMessage, config.privateMessage]);
 
   const photos = useMemo(() => {
     const merged = [...(config.heroImages || []), config.heroImage].filter(Boolean);
@@ -1232,7 +1160,7 @@ function Invitation({ config, isOpened }) {
 
       {/* Lời nhắn riêng: ưu tiên tin nhắn của khách, fallback về config chung */}
       {(guest?.privateMessage || config.privateMessage) && (
-        <section ref={privateMessageRef} className="content-section private-message" data-reveal>
+        <section className="content-section private-message" data-reveal>
           <Heart size={22} />
           <div>
             <p className="eyebrow">Lời nhắn gửi riêng</p>
