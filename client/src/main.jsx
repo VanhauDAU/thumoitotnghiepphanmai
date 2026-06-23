@@ -820,7 +820,7 @@ function EnvelopeScreen({ config, guest, onOpen }) {
           <div className="letter-card-reveal">
             <p>Thư mời tốt nghiệp</p>
             <strong>{config.graduateName || "Lễ Tốt Nghiệp"}</strong>
-            {guest && <span>Gửi {guest.relation} {guest.name}</span>}
+            {guest && <span>Gửi {guest.name}</span>}
           </div>
           {/* Nắp phong bì */}
           <div className="envelope-flap">
