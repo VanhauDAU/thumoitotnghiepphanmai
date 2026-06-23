@@ -1,5 +1,158 @@
 [
   {
+    "id": "1fb5f9a7-7270-4d76-bc28-e1c81693cd85",
+    "type": "admin",
+    "actor": "Admin",
+    "guestName": "",
+    "guestRelation": "",
+    "guestToken": "",
+    "path": "/api/admin-visit",
+    "ip": "::1",
+    "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36",
+    "device": {
+      "browser": "Chrome",
+      "platform": "macOS",
+      "type": "Máy tính"
+    },
+    "createdAt": "2026-06-23T14:33:47.777Z"
+  },
+  {
+    "id": "7b57a807-e26d-4e02-a686-1e778b534bda",
+    "type": "guest",
+    "actor": "Lê Văn Hậu",
+    "guestName": "Lê Văn Hậu",
+    "guestRelation": "Bạn",
+    "guestToken": "7461cf9c-2bab-41b1-a6db-d0a429a6989b",
+    "path": "/api/guest/7461cf9c-2bab-41b1-a6db-d0a429a6989b",
+    "ip": "::1",
+    "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36",
+    "device": {
+      "browser": "Chrome",
+      "platform": "macOS",
+      "type": "Máy tính"
+    },
+    "createdAt": "2026-06-23T14:33:36.066Z"
+  },
+  {
+    "id": "37bdaa14-de4f-4f26-b369-90c8b1270270",
+    "type": "guest",
+    "actor": "Lê Văn Hậu",
+    "guestName": "Lê Văn Hậu",
+    "guestRelation": "Bạn",
+    "guestToken": "7461cf9c-2bab-41b1-a6db-d0a429a6989b",
+    "path": "/api/guest/7461cf9c-2bab-41b1-a6db-d0a429a6989b",
+    "ip": "::1",
+    "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36",
+    "device": {
+      "browser": "Chrome",
+      "platform": "macOS",
+      "type": "Máy tính"
+    },
+    "createdAt": "2026-06-23T14:33:31.869Z"
+  },
+  {
+    "id": "fdebd876-497e-42b2-93b2-e83c85310082",
+    "type": "admin",
+    "actor": "Admin",
+    "guestName": "",
+    "guestRelation": "",
+    "guestToken": "",
+    "path": "/api/admin-visit",
+    "ip": "::1",
+    "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36",
+    "device": {
+      "browser": "Chrome",
+      "platform": "macOS",
+      "type": "Máy tính"
+    },
+    "createdAt": "2026-06-23T14:33:01.992Z"
+  },
+  {
+    "id": "e954e6f3-47b2-433c-b014-4c6d7cde9cd0",
+    "type": "admin",
+    "actor": "Admin",
+    "guestName": "",
+    "guestRelation": "",
+    "guestToken": "",
+    "path": "/api/admin-visit",
+    "ip": "::1",
+    "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36",
+    "device": {
+      "browser": "Chrome",
+      "platform": "macOS",
+      "type": "Máy tính"
+    },
+    "createdAt": "2026-06-23T14:31:41.999Z"
+  },
+  {
+    "id": "176c7e83-ab7c-4c61-a53b-c784ecd6d727",
+    "type": "admin",
+    "actor": "Admin",
+    "guestName": "",
+    "guestRelation": "",
+    "guestToken": "",
+    "path": "/api/admin-visit",
+    "ip": "::1",
+    "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36",
+    "device": {
+      "browser": "Chrome",
+      "platform": "macOS",
+      "type": "Máy tính"
+    },
+    "createdAt": "2026-06-23T14:28:30.619Z"
+  },
+  {
+    "id": "e3fba58d-2abf-4453-8fe8-10054485cecf",
+    "type": "admin",
+    "actor": "Admin",
+    "guestName": "",
+    "guestRelation": "",
+    "guestToken": "",
+    "path": "/api/admin-visit",
+    "ip": "::1",
+    "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36",
+    "device": {
+      "browser": "Chrome",
+      "platform": "macOS",
+      "type": "Máy tính"
+    },
+    "createdAt": "2026-06-23T14:26:55.545Z"
+  },
+  {
+    "id": "e3910ca5-df3d-4cdd-a2ad-983532238639",
+    "type": "admin",
+    "actor": "Admin",
+    "guestName": "",
+    "guestRelation": "",
+    "guestToken": "",
+    "path": "/api/admin-visit",
+    "ip": "::1",
+    "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36",
+    "device": {
+      "browser": "Chrome",
+      "platform": "macOS",
+      "type": "Máy tính"
+    },
+    "createdAt": "2026-06-23T14:26:51.475Z"
+  },
+  {
+    "id": "beb745be-c03f-479d-a938-5afda6eab452",
+    "type": "admin",
+    "actor": "Admin",
+    "guestName": "",
+    "guestRelation": "",
+    "guestToken": "",
+    "path": "/api/admin-visit",
+    "ip": "::1",
+    "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36",
+    "device": {
+      "browser": "Chrome",
+      "platform": "macOS",
+      "type": "Máy tính"
+    },
+    "createdAt": "2026-06-23T14:26:27.304Z"
+  },
+  {
     "id": "ae466ae2-bfa6-4f39-a422-127f228df733",
     "type": "admin",
     "actor": "Admin",

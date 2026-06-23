@@ -339,19 +339,23 @@ app.get("/api/guests", requireAdmin, async (_req, res, next) => {
 // POST /api/guests — create a new guest
 app.post("/api/guests", requireAdmin, async (req, res, next) => {
   try {
-    const { name, relation, privateMessage, photo, photoCrop } = req.body;
+    const { name, relation, privateMessage, photo, photoCrop, photos, photoCrops } = req.body;
     if (!name || !name.trim()) {
       return res.status(400).json({ message: "Tên khách mời không được để trống" });
     }
     const guests = await readGuests();
+    // Hỗ trợ cả photos[] (mới) lẫn photo (cũ)
+    const normalizedPhotos = Array.isArray(photos) ? photos.filter(Boolean) : (photo ? [photo] : []);
     const guest = {
       id: randomUUID(),
       token: randomUUID(),
       name: name.trim(),
       relation: relation || "Bạn",
       privateMessage: privateMessage || "",
-      photo: photo || "",
-      photoCrop: photoCrop || { x: 50, y: 50 },
+      photos: normalizedPhotos,
+      photo: normalizedPhotos[0] || "",           // compat cũ
+      photoCrops: Array.isArray(photoCrops) ? photoCrops : [],
+      photoCrop: (Array.isArray(photoCrops) ? photoCrops[0] : photoCrop) || { x: 50, y: 50 }, // compat cũ
       createdAt: new Date().toISOString()
     };
     guests.unshift(guest);
@@ -368,14 +372,28 @@ app.put("/api/guests/:id", requireAdmin, async (req, res, next) => {
     const guests = await readGuests();
     const index = guests.findIndex((g) => g.id === req.params.id);
     if (index === -1) return res.status(404).json({ message: "Không tìm thấy khách" });
-    const { name, relation, privateMessage, photo, photoCrop } = req.body;
+    const { name, relation, privateMessage, photo, photoCrop, photos, photoCrops } = req.body;
+    // Hỗ trợ photos[] mới, compat ngược photo cũ
+    let normalizedPhotos;
+    if (photos !== undefined) {
+      normalizedPhotos = Array.isArray(photos) ? photos.filter(Boolean) : [];
+    } else if (photo !== undefined) {
+      normalizedPhotos = photo ? [photo] : [];
+    } else {
+      normalizedPhotos = guests[index].photos || (guests[index].photo ? [guests[index].photo] : []);
+    }
+    const normalizedCrops = photoCrops !== undefined
+      ? (Array.isArray(photoCrops) ? photoCrops : [])
+      : (guests[index].photoCrops || []);
     guests[index] = {
       ...guests[index],
       name: name !== undefined ? name.trim() : guests[index].name,
       relation: relation !== undefined ? relation : guests[index].relation,
       privateMessage: privateMessage !== undefined ? privateMessage : guests[index].privateMessage,
-      photo: photo !== undefined ? photo : (guests[index].photo || ""),
-      photoCrop: photoCrop !== undefined ? photoCrop : (guests[index].photoCrop || { x: 50, y: 50 })
+      photos: normalizedPhotos,
+      photo: normalizedPhotos[0] || "",
+      photoCrops: normalizedCrops,
+      photoCrop: normalizedCrops[0] || (guests[index].photoCrop || { x: 50, y: 50 })
     };
     await writeGuests(guests);
     res.json(guests[index]);
@@ -411,12 +429,20 @@ app.get("/api/guest/:token", async (req, res, next) => {
       guestToken: guest.token
     });
     // Chỉ trả về thông tin cần thiết cho trang mời (không expose id nội bộ)
+    const guestPhotos = Array.isArray(guest.photos) && guest.photos.length > 0
+      ? guest.photos
+      : (guest.photo ? [guest.photo] : []);
+    const guestCrops = Array.isArray(guest.photoCrops) && guest.photoCrops.length > 0
+      ? guest.photoCrops
+      : (guest.photoCrop ? [guest.photoCrop] : []);
     res.json({
       name: guest.name,
       relation: guest.relation,
       privateMessage: guest.privateMessage || "",
-      photo: guest.photo || "",
-      photoCrop: guest.photoCrop || { x: 50, y: 50 }
+      photo: guestPhotos[0] || "",           // compat cũ
+      photoCrop: guestCrops[0] || { x: 50, y: 50 }, // compat cũ
+      photos: guestPhotos,
+      photoCrops: guestCrops
     });
   } catch (error) {
     next(error);

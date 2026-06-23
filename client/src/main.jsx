@@ -1077,6 +1077,78 @@ function Invitation({ config, isOpened }) {
   const { guest, checked } = useGuestToken();
   useScrollReveal();
   const inviteToken = useMemo(() => new URLSearchParams(window.location.search).get("token") || "", []);
+  const privateMessageRef = useRef(null);
+  const voicePlayedRef = useRef(false);
+
+  useEffect(() => {
+    if (!isOpened) return;
+    const textToSpeak = guest?.privateMessage || config.privateMessage;
+    if (!textToSpeak) return;
+
+    if (voicePlayedRef.current) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting && !voicePlayedRef.current) {
+            voicePlayedRef.current = true;
+            observer.disconnect();
+
+            const synth = window.speechSynthesis;
+            if (synth) {
+              synth.cancel();
+
+              const getViVoice = () => {
+                const voices = synth.getVoices();
+                return voices.find(v => 
+                  (v.lang.includes("vi") || v.lang.includes("VI")) && 
+                  (v.name.toLowerCase().includes("female") || 
+                   v.name.toLowerCase().includes("linh") || 
+                   v.name.toLowerCase().includes("huyen") ||
+                   v.name.toLowerCase().includes("an"))
+                ) || voices.find(v => v.lang.includes("vi") || v.lang.includes("VI"));
+              };
+
+              const speak = () => {
+                const utterance = new SpeechSynthesisUtterance(textToSpeak);
+                utterance.lang = "vi-VN";
+                const viVoice = getViVoice();
+                if (viVoice) {
+                  utterance.voice = viVoice;
+                }
+                utterance.rate = 0.95;
+                utterance.pitch = 1.05;
+                synth.speak(utterance);
+              };
+
+              if (synth.getVoices().length === 0) {
+                const onVoicesChanged = () => {
+                  speak();
+                  synth.removeEventListener("voiceschanged", onVoicesChanged);
+                };
+                synth.addEventListener("voiceschanged", onVoicesChanged);
+              } else {
+                speak();
+              }
+            }
+          }
+        });
+      },
+      { threshold: 0.25 }
+    );
+
+    const currentRef = privateMessageRef.current;
+    if (currentRef) {
+      observer.observe(currentRef);
+    }
+
+    return () => {
+      if (currentRef) {
+        observer.unobserve(currentRef);
+      }
+      observer.disconnect();
+    };
+  }, [isOpened, guest?.privateMessage, config.privateMessage]);
 
   const photos = useMemo(() => {
     const merged = [...(config.heroImages || []), config.heroImage].filter(Boolean);
@@ -1125,6 +1197,8 @@ function Invitation({ config, isOpened }) {
           crops={config.heroImageCrops || {}}
           guestPhoto={guest?.photo || ""}
           guestPhotoCrop={guest?.photoCrop || { x: 50, y: 50 }}
+          guestPhotos={guest?.photos || []}
+          guestPhotoCrops={guest?.photoCrops || []}
         />
         <div className="hero-copy">
           <p className="eyebrow">Thư mời dự tốt nghiệp</p>
@@ -1158,7 +1232,7 @@ function Invitation({ config, isOpened }) {
 
       {/* Lời nhắn riêng: ưu tiên tin nhắn của khách, fallback về config chung */}
       {(guest?.privateMessage || config.privateMessage) && (
-        <section className="content-section private-message" data-reveal>
+        <section ref={privateMessageRef} className="content-section private-message" data-reveal>
           <Heart size={22} />
           <div>
             <p className="eyebrow">Lời nhắn gửi riêng</p>
@@ -1260,18 +1334,24 @@ function Invitation({ config, isOpened }) {
 
 // ── Photo Carousel ─────────────────────────────────────────────────────────────
 
-function PhotoCarousel({ photos, graduateName, crops = {}, guestPhoto = "", guestPhotoCrop = { x: 50, y: 50 } }) {
+function PhotoCarousel({ photos, graduateName, crops = {}, guestPhoto = "", guestPhotoCrop = { x: 50, y: 50 }, guestPhotos = [], guestPhotoCrops = [] }) {
   const [activeIndex, setActiveIndex] = useState(0);
   const touchStart = useRef(0);
   const touchDelta = useRef(0);
 
-  // Khi có guestPhoto: slide 0 = hero[0] + guest (cố định)
-  // slide 1+ = như cũ (các ảnh hero ghep&pại)
+  // Khi có guest photos: slide 0 = hero[0] + guest photos (cố định)
+  // slide 1+ = như cũ (các ảnh hero ghép cặp)
   const slides = useMemo(() => {
     if (!photos.length) return [];
-    if (guestPhoto) {
-      // Slide 0 riêng: hero[0] + guest
-      const guestSlide = { type: "guest", heroPhoto: photos[0], guestPhoto };
+    
+    const gPhotos = Array.isArray(guestPhotos) && guestPhotos.length > 0
+      ? guestPhotos.filter(Boolean)
+      : (guestPhoto ? [guestPhoto] : []);
+    const gCrops = Array.isArray(guestPhotoCrops) ? guestPhotoCrops : [];
+
+    if (gPhotos.length > 0) {
+      // Slide 0 riêng: hero[0] + guest photos
+      const guestSlide = { type: "guest", heroPhoto: photos[0], guestPhotos: gPhotos, guestPhotoCrops: gCrops };
       // Slide 1+: các ảnh hero còn lại ghép cặp
       const extraSlides = photos.slice(1).map((image, i) => ({
         type: "hero",
@@ -1285,7 +1365,7 @@ function PhotoCarousel({ photos, graduateName, crops = {}, guestPhoto = "", gues
       framePhotos: [image, photos[(index + 1) % photos.length]]
         .filter((item, itemIndex, items) => item && items.indexOf(item) === itemIndex)
     }));
-  }, [photos, guestPhoto]);
+  }, [photos, guestPhoto, guestPhotos, guestPhotoCrop, guestPhotoCrops]);
 
   const hasManySlides = slides.length > 1;
 
@@ -1297,7 +1377,7 @@ function PhotoCarousel({ photos, graduateName, crops = {}, guestPhoto = "", gues
     return () => window.clearInterval(timer);
   }, [hasManySlides, slides.length]);
 
-  useEffect(() => { setActiveIndex(0); }, [photos.length, guestPhoto]);
+  useEffect(() => { setActiveIndex(0); }, [photos.length, guestPhoto, guestPhotos]);
 
   const goTo = (index) => {
     if (!slides.length) return;
@@ -1336,7 +1416,31 @@ function PhotoCarousel({ photos, graduateName, crops = {}, guestPhoto = "", gues
       <div className="carousel-track" style={{ transform: `translateX(-${activeIndex * 100}%)` }}>
         {slides.map((slide, index) => {
           if (slide.type === "guest") {
-            // Slide đặc biệt: hero + guest
+            const hasMultiple = slide.guestPhotos.length >= 2;
+            if (hasMultiple) {
+              return (
+                <figure className="carousel-slide photo-guest-multi" key={`guest-slide-${index}`}>
+                  <img
+                    src={resolveAsset(slide.heroPhoto)}
+                    alt={`${graduateName}`}
+                    className="photo-card main-photo"
+                    style={{ objectPosition: `${crops[slide.heroPhoto]?.x ?? 50}% ${crops[slide.heroPhoto]?.y ?? 50}%` }}
+                  />
+                  <div className="guest-photos-stack">
+                    {slide.guestPhotos.slice(0, 2).map((url, idx) => (
+                      <img
+                        key={`${url}-${idx}`}
+                        src={resolveAsset(url)}
+                        alt={`Ảnh khách mời ${idx + 1}`}
+                        className="guest-stack-photo"
+                        style={{ objectPosition: `${(slide.guestPhotoCrops[idx] || guestPhotoCrop)?.x ?? 50}% ${(slide.guestPhotoCrops[idx] || guestPhotoCrop)?.y ?? 50}%` }}
+                      />
+                    ))}
+                  </div>
+                </figure>
+              );
+            }
+            // Slide đặc biệt: hero + 1 guest photo
             return (
               <figure className="carousel-slide photo-count-2" key={`guest-slide-${index}`}>
                 <img
@@ -1346,10 +1450,10 @@ function PhotoCarousel({ photos, graduateName, crops = {}, guestPhoto = "", gues
                   style={{ objectPosition: `${crops[slide.heroPhoto]?.x ?? 50}% ${crops[slide.heroPhoto]?.y ?? 50}%` }}
                 />
                 <img
-                  src={resolveAsset(slide.guestPhoto)}
+                  src={resolveAsset(slide.guestPhotos[0])}
                   alt="Ảnh khách mời"
                   className="photo-card side-photo"
-                  style={{ objectPosition: `${guestPhotoCrop?.x ?? 50}% ${guestPhotoCrop?.y ?? 50}%` }}
+                  style={{ objectPosition: `${(slide.guestPhotoCrops[0] || guestPhotoCrop)?.x ?? 50}% ${(slide.guestPhotoCrops[0] || guestPhotoCrop)?.y ?? 50}%` }}
                 />
               </figure>
             );
@@ -2008,8 +2112,8 @@ function GuestManager({ authHeaders }) {
   const [name, setName] = useState("");
   const [relation, setRelation] = useState("Bạn");
   const [privateMessage, setPrivateMessage] = useState("");
-  const [photo, setPhoto] = useState("");
-  const [photoCrop, setPhotoCrop] = useState({ x: 50, y: 50 });
+  const [photos, setPhotos] = useState([]);
+  const [photoCrops, setPhotoCrops] = useState([]);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState("");
@@ -2062,7 +2166,13 @@ function GuestManager({ authHeaders }) {
       const res = await fetch("/api/guests", {
         method: "POST",
         headers: { "Content-Type": "application/json", ...authHeaders() },
-        body: JSON.stringify({ name: name.trim(), relation, privateMessage: privateMessage.trim(), photo, photoCrop })
+        body: JSON.stringify({
+          name: name.trim(),
+          relation,
+          privateMessage: privateMessage.trim(),
+          photos,
+          photoCrops
+        })
       });
       if (!res.ok) {
         const data = await res.json();
@@ -2070,7 +2180,7 @@ function GuestManager({ authHeaders }) {
       }
       const guest = await res.json();
       setGuests((prev) => [guest, ...prev]);
-      setName(""); setPrivateMessage(""); setPhoto(""); setPhotoCrop({ x: 50, y: 50 });
+      setName(""); setPrivateMessage(""); setPhotos([]); setPhotoCrops([]);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -2080,12 +2190,18 @@ function GuestManager({ authHeaders }) {
 
   const startEdit = (guest) => {
     setEditingId(guest.id);
+    const gPhotos = Array.isArray(guest.photos) && guest.photos.length > 0
+      ? guest.photos
+      : (guest.photo ? [guest.photo] : []);
+    const gCrops = Array.isArray(guest.photoCrops) && guest.photoCrops.length > 0
+      ? guest.photoCrops
+      : (guest.photoCrop ? [guest.photoCrop] : []);
     setEditDraft({
       name: guest.name,
       relation: guest.relation,
       privateMessage: guest.privateMessage || "",
-      photo: guest.photo || "",
-      photoCrop: guest.photoCrop || { x: 50, y: 50 }
+      photos: gPhotos,
+      photoCrops: gCrops
     });
   };
 
@@ -2133,69 +2249,103 @@ function GuestManager({ authHeaders }) {
     });
   };
 
-  // Sub-component: ô upload + slider crop dùng chung
-  const GuestPhotoEditor = ({ currentPhoto, currentCrop, onPhotoChange, onCropChange }) => (
-    <div className="guest-photo-editor">
-      <span className="guest-form-label">📸 Ảnh khách mời (hiển thị cạnh ảnh tốt nghiệp)</span>
-      <div className="guest-photo-preview-row">
-        {currentPhoto ? (
-          <img
-            src={resolveAsset(currentPhoto)}
-            alt="Ảnh khách"
-            className="guest-photo-thumb"
-            style={{ objectPosition: `${currentCrop?.x ?? 50}% ${currentCrop?.y ?? 50}%` }}
-          />
-        ) : (
-          <div className="guest-photo-empty">Chưa có ảnh</div>
+  // Sub-component: editor nhiều ảnh khách mời (tối đa 2)
+  const GuestPhotosEditor = ({ currentPhotos = [], currentCrops = [], onPhotosChange, onCropsChange }) => {
+    const addPhoto = (url) => {
+      onPhotosChange([...currentPhotos, url]);
+      onCropsChange([...currentCrops, { x: 50, y: 50 }]);
+    };
+    const removePhoto = (idx) => {
+      onPhotosChange(currentPhotos.filter((_, i) => i !== idx));
+      onCropsChange(currentCrops.filter((_, i) => i !== idx));
+    };
+    const updateCrop = (idx, crop) => {
+      const next = [...currentCrops];
+      next[idx] = crop;
+      onCropsChange(next);
+    };
+    return (
+      <div className="guest-photo-editor">
+        <span className="guest-form-label">
+          📸 Ảnh khách mời
+          {currentPhotos.length >= 2 && (
+            <span className="guest-photo-badge">
+              ✨ 2 ảnh → layout 1 lớn + 2 nhỏ dọc
+            </span>
+          )}
+        </span>
+
+        {/* Danh sách ảnh hiện tại */}
+        {currentPhotos.length > 0 && (
+          <div className="guest-multi-photos-list">
+            {currentPhotos.map((url, idx) => (
+              <div className="guest-multi-photo-item" key={`${url}-${idx}`}>
+                <div className="guest-multi-photo-preview-row">
+                  <img
+                    src={resolveAsset(url)}
+                    alt={`Ảnh khách ${idx + 1}`}
+                    className="guest-photo-thumb"
+                    style={{ objectPosition: `${currentCrops[idx]?.x ?? 50}% ${currentCrops[idx]?.y ?? 50}%` }}
+                  />
+                  <div className="guest-multi-photo-label">
+                    <span>Ảnh {idx + 1}{idx === 0 ? " (chính)" : ""}</span>
+                    <button
+                      type="button"
+                      className="guest-photo-remove-btn"
+                      onClick={() => removePhoto(idx)}
+                      title="Xóa ảnh này"
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
+                </div>
+                <div className="guest-crop-sliders">
+                  <label>
+                    <span>Vị trí ngang ({currentCrops[idx]?.x ?? 50}%)</span>
+                    <input
+                      type="range" min="0" max="100"
+                      value={currentCrops[idx]?.x ?? 50}
+                      onChange={(e) => updateCrop(idx, { ...currentCrops[idx], x: Number(e.target.value) })}
+                    />
+                  </label>
+                  <label>
+                    <span>Vị trí dọc ({currentCrops[idx]?.y ?? 50}%)</span>
+                    <input
+                      type="range" min="0" max="100"
+                      value={currentCrops[idx]?.y ?? 50}
+                      onChange={(e) => updateCrop(idx, { ...currentCrops[idx], y: Number(e.target.value) })}
+                    />
+                  </label>
+                </div>
+              </div>
+            ))}
+          </div>
         )}
-        <label className="guest-photo-upload-btn">
-          <Camera size={15} />
-          {uploadingPhoto ? "Đang tải..." : currentPhoto ? "Đổi ảnh" : "Tải ảnh lên"}
-          <input
-            type="file"
-            accept="image/*"
-            style={{ display: "none" }}
-            disabled={uploadingPhoto}
-            onChange={(e) => {
-              const file = e.target.files?.[0];
-              if (file) uploadGuestPhoto(file, onPhotoChange);
-              e.target.value = "";
-            }}
-          />
-        </label>
-        {currentPhoto && (
-          <button
-            type="button"
-            className="guest-photo-remove-btn"
-            onClick={() => onPhotoChange("")}
-            title="Xoá ảnh"
-          >
-            <Trash2 size={14} />
-          </button>
+
+        {/* Nút thêm ảnh — tối đa 2 */}
+        {currentPhotos.length < 2 && (
+          <label className="guest-photo-upload-btn">
+            <Camera size={15} />
+            {uploadingPhoto ? "Đang tải..." : currentPhotos.length === 0 ? "Tải ảnh lên" : "Thêm ảnh thứ 2"}
+            <input
+              type="file"
+              accept="image/*"
+              style={{ display: "none" }}
+              disabled={uploadingPhoto}
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) uploadGuestPhoto(file, addPhoto);
+                e.target.value = "";
+              }}
+            />
+          </label>
+        )}
+        {currentPhotos.length === 0 && (
+          <div className="guest-photo-empty" style={{ width: "100%", height: 56 }}>Chưa có ảnh</div>
         )}
       </div>
-      {currentPhoto && (
-        <div className="guest-crop-sliders">
-          <label>
-            <span>Vị trí ngang ({currentCrop?.x ?? 50}%)</span>
-            <input
-              type="range" min="0" max="100"
-              value={currentCrop?.x ?? 50}
-              onChange={(e) => onCropChange({ ...currentCrop, x: Number(e.target.value) })}
-            />
-          </label>
-          <label>
-            <span>Vị trí dọc ({currentCrop?.y ?? 50}%)</span>
-            <input
-              type="range" min="0" max="100"
-              value={currentCrop?.y ?? 50}
-              onChange={(e) => onCropChange({ ...currentCrop, y: Number(e.target.value) })}
-            />
-          </label>
-        </div>
-      )}
-    </div>
-  );
+    );
+  };
 
   return (
     <section className="admin-panel guest-manager">
@@ -2239,11 +2389,11 @@ function GuestManager({ authHeaders }) {
             rows={2}
           />
         </label>
-        <GuestPhotoEditor
-          currentPhoto={photo}
-          currentCrop={photoCrop}
-          onPhotoChange={setPhoto}
-          onCropChange={setPhotoCrop}
+        <GuestPhotosEditor
+          currentPhotos={photos}
+          currentCrops={photoCrops}
+          onPhotosChange={setPhotos}
+          onCropsChange={setPhotoCrops}
         />
         <button type="submit" disabled={creating || !name.trim()} className="guest-create-btn">
           <Link2 size={18} />
@@ -2294,11 +2444,11 @@ function GuestManager({ authHeaders }) {
                       placeholder="Lời nhắn gửi riêng đến khách này..."
                     />
                   </label>
-                  <GuestPhotoEditor
-                    currentPhoto={editDraft.photo || ""}
-                    currentCrop={editDraft.photoCrop || { x: 50, y: 50 }}
-                    onPhotoChange={(url) => setEditDraft((d) => ({ ...d, photo: url }))}
-                    onCropChange={(crop) => setEditDraft((d) => ({ ...d, photoCrop: crop }))}
+                  <GuestPhotosEditor
+                    currentPhotos={editDraft.photos || []}
+                    currentCrops={editDraft.photoCrops || []}
+                    onPhotosChange={(p) => setEditDraft((d) => ({ ...d, photos: p }))}
+                    onCropsChange={(c) => setEditDraft((d) => ({ ...d, photoCrops: c }))}
                   />
                   <div className="guest-edit-actions">
                     <button
@@ -2318,12 +2468,14 @@ function GuestManager({ authHeaders }) {
               ) : (
                 <div className="guest-info">
                   <div className="guest-name-row">
-                    {guest.photo && (
+                    {((Array.isArray(guest.photos) && guest.photos.length > 0) || guest.photo) && (
                       <img
-                        src={resolveAsset(guest.photo)}
+                        src={resolveAsset(Array.isArray(guest.photos) && guest.photos.length > 0 ? guest.photos[0] : guest.photo)}
                         alt={guest.name}
                         className="guest-list-photo"
-                        style={{ objectPosition: `${guest.photoCrop?.x ?? 50}% ${guest.photoCrop?.y ?? 50}%` }}
+                        style={{
+                          objectPosition: `${(Array.isArray(guest.photoCrops) && guest.photoCrops.length > 0 ? guest.photoCrops[0] : guest.photoCrop)?.x ?? 50}% ${(Array.isArray(guest.photoCrops) && guest.photoCrops.length > 0 ? guest.photoCrops[0] : guest.photoCrop)?.y ?? 50}%`
+                        }}
                       />
                     )}
                     <div>

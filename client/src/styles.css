@@ -2385,6 +2385,100 @@ a {
   flex-shrink: 0;
 }
 
+/* ═══════════════════════════════════════════════════
+   LAYOUT ≥2 ẢNH KHÁCH: 1 hero lớn trái + 2 nhỏ dọc phải
+   (như ảnh đính kèm: 1 ảnh lớn bên trái, 2 ảnh nhỏ xếp dọc bên phải)
+   ═══════════════════════════════════════════════════ */
+
+/* Layout 3 ô: 1 cột lớn (60%) + 1 cột nhỏ (40%) */
+.photo-guest-multi {
+  grid-template-columns: 1.45fr 1fr;
+  grid-template-rows: minmax(0, 1fr);
+}
+
+/* Cột bên phải chứa 2 ảnh nhỏ xếp dọc */
+.guest-photos-stack {
+  display: grid;
+  grid-column: 2;
+  grid-row: 1;
+  grid-template-rows: 1fr 1fr;
+  gap: 10px;
+  min-height: 0;
+  height: 100%;
+}
+
+/* Mỗi ảnh nhỏ trong stack */
+.guest-stack-photo {
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  object-fit: cover;
+  border: 4px solid rgb(255 250 242 / 94%);
+  border-radius: 14px;
+  background: #f1dfcb;
+  box-shadow: 0 12px 24px rgb(24 16 10 / 22%);
+  transform: translateZ(0);
+  animation: photoBreath 6.8s ease-in-out infinite alternate;
+}
+
+.guest-stack-photo:nth-child(2) {
+  animation-delay: -2.4s;
+}
+
+/* ── Admin: Multi-photo editor UI ── */
+
+.guest-multi-photos-list {
+  display: grid;
+  gap: 12px;
+}
+
+.guest-multi-photo-item {
+  padding: 10px;
+  border: 1px solid #e8d9c8;
+  border-radius: 10px;
+  background: #fff;
+  display: grid;
+  gap: 10px;
+}
+
+.guest-multi-photo-preview-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.guest-multi-photo-label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex: 1;
+  gap: 8px;
+}
+
+.guest-multi-photo-label span {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #6d5847;
+}
+
+/* Badge thông báo layout đặc biệt */
+.guest-photo-badge {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #2e5961, #8e5d3c);
+  color: #fff;
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.guest-form-label {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
+}
 
 
 @media (max-width: 520px) {
