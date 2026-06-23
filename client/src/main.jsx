@@ -1142,7 +1142,7 @@ function Invitation({ config, isOpened }) {
           <div className="guest-banner-inner">
             <Heart size={20} className="guest-banner-icon" />
             <p>
-              Kính mời <span className="guest-relation">{guest.relation}</span>{" "}
+              Kính mời {" "}
               <strong className="guest-name">{guest.name}</strong>
             </p>
           </div>
